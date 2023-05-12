@@ -15,7 +15,6 @@ class ChatDatabase:
                 conn.commit()
                 return True
             except sqlite3.IntegrityError:
-                # username already exists
                 return False
         
     def authenticate_user(self, username, password):

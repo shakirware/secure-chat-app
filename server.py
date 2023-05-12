@@ -1,9 +1,13 @@
+from database import ChatDatabase
 import threading
 import socket
 import ssl
 import re
 import logging
-from database import ChatDatabase
+
+MAX_CLIENTS = 5
+MESSAGE_BUFFER_SIZE = 1024
+DATABASE_FILE = 'chat.db'
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -19,27 +23,30 @@ class ChatServer(threading.Thread):
         self.ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         self.ssl_context.load_cert_chain(certfile=self.certfile, keyfile=self.keyfile)
         self.server_socket_ssl = self.ssl_context.wrap_socket(self.server_socket, server_side=True)
-        self.server_socket_ssl.listen(5)
+        self.server_socket_ssl.listen(MAX_CLIENTS)
         self.clients = []
         self.authenticated_clients = {}
-        self.db = ChatDatabase('chat.db')
+        self.database = ChatDatabase(DATABASE_FILE)
         
     def run(self):
-        logging.info('Server started on {}:{}'.format(self.host, self.port))
+        logging.info(f'Server started on {self.host}:{self.port}')
         while True:
             client_socket_ssl, client_address = self.server_socket_ssl.accept()
             client_thread = threading.Thread(target=self.handle_client, args=(client_socket_ssl,))
             client_thread.start()
             self.clients.append(client_socket_ssl)
-            logging.info('New client connected from {}'.format(client_address))
+            logging.info(f'New client connected from {client_address}')
             
     def handle_client(self, client_socket_ssl):
         while True:
             try:
-                message = client_socket_ssl.recv(1024).decode('utf-8')
-                
+                message = client_socket_ssl.recv(MESSAGE_BUFFER_SIZE).decode('utf-8')
                 if client_socket_ssl in self.authenticated_clients:
-                    self.broadcast(message, client_socket_ssl)
+                    if message.startswith('/logout'):
+                        self.logout_user(client_socket_ssl)
+                        break
+                    else:
+                        self.broadcast(message, client_socket_ssl)
                 else:
                     if message.startswith('/register'):
                         match = re.match(r'^/register (\S+) (\S+)$', message)
@@ -59,7 +66,6 @@ class ChatServer(threading.Thread):
                 del self.authenticated_clients[client_socket_ssl]
                 self.clients.remove(client_socket_ssl)
                 break
-        logging.info('Client disconnected')
                 
     def broadcast(self, message, client_socket_ssl):
         username = self.authenticated_clients[client_socket_ssl]
@@ -75,20 +81,27 @@ class ChatServer(threading.Thread):
             self.clients.remove(client)
             del self.authenticated_clients[client]
 
-        logging.info('Message broadcasted: {} from {}'.format(message, username))
+        logging.info(f'Message broadcasted: {message} from {username}')
+        
+    def logout_user(self, client_socket_ssl):
+        username = self.authenticated_clients[client_socket_ssl]
+        del self.authenticated_clients[client_socket_ssl]
+        self.clients.remove(client_socket_ssl)
+        logging.info(f'User Logged Out: {username}')
+        client_socket_ssl.send('You have been logged out.'.encode('utf-8'))
     
     def register_user(self, username, password, client_socket_ssl):
-        if self.db.register_user(username, password):
+        if self.database.register_user(username, password):
             client_socket_ssl.send('User registered successfully.'.encode('utf-8'))
-            logging.info('User Registered: {}'.format(username))
+            logging.info('User Registered: {username}')
         else:
             client_socket_ssl.send('User already exists.'.encode('utf-8'))
         
     def authenticate_user(self, username, password, client_socket_ssl):
-        if self.db.authenticate_user(username, password):
+        if self.database.authenticate_user(username, password):
             client_socket_ssl.send('User logged in.'.encode('utf-8'))
             self.authenticated_clients[client_socket_ssl] = username
-            logging.info('User Logged In: {}'.format(username))
+            logging.info(f'User Logged In: {username}')
         else:
             client_socket_ssl.send('Invalid username or password.'.encode('utf-8'))
         
