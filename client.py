@@ -29,8 +29,8 @@ class ChatClient:
         self.connect()
         print("Connected to server")
         
-        username = input("Enter username: ")
-        self.send_message(f"{username} has joined the chat")
+        #username = input("Enter username: ")
+        #self.send_message(f"{username} has joined the chat")
         
         receive_thread = threading.Thread(target=self.receive_messages)
         receive_thread.start()
@@ -38,11 +38,11 @@ class ChatClient:
         while True:
             message = input()
             if message.lower() == "quit":
-                self.send_message(f"{username} has left the chat")
+                #self.send_message(f"{username} has left the chat")
                 self.socket.close()
                 break
             else:
-                self.send_message(f"{username}: {message}")
+                self.send_message(f"{message}")
                 
 if __name__ == '__main__':
     certfile = './certs/server.crt'
