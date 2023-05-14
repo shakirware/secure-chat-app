@@ -1,9 +1,12 @@
 from database import ChatDatabase
+from cryptography.hazmat.primitives.asymmetric import x25519
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 import threading
 import socket
 import ssl
 import re
 import logging
+import base64
 
 MAX_CLIENTS = 5
 MESSAGE_BUFFER_SIZE = 1024
@@ -60,6 +63,11 @@ class ChatServer(threading.Thread):
                             self.authenticate_user(username, password, client_socket_ssl)
                         else:
                             client_socket_ssl.send('Invalid login command format.'.encode('utf-8'))
+                    elif message.startswith('/public_key'):
+                        public_key_b64 = message.split(maxsplit=1)[1]
+                        public_key_bytes = base64.b64decode(public_key_b64)
+                        public_key = x25519.X25519PublicKey.from_public_bytes(public_key_bytes)
+                        logging.info(f'Public key received from {client_socket_ssl.getpeername()}: {public_key.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo)}')
                     else:
                         client_socket_ssl.send('You must be authenticated to send messages. Please log in or register.'.encode('utf-8'))
             except:
