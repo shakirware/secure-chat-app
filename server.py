@@ -7,6 +7,8 @@ import ssl
 import re
 import logging
 import base64
+import traceback
+
 
 MAX_CLIENTS = 5
 MESSAGE_BUFFER_SIZE = 1024
@@ -27,7 +29,7 @@ class ChatServer(threading.Thread):
         self.ssl_context.load_cert_chain(certfile=self.certfile, keyfile=self.keyfile)
         self.server_socket_ssl = self.ssl_context.wrap_socket(self.server_socket, server_side=True)
         self.server_socket_ssl.listen(MAX_CLIENTS)
-        self.clients = []
+        self.clients = {}
         self.authenticated_clients = {}
         self.database = ChatDatabase(DATABASE_FILE)
         
@@ -37,7 +39,7 @@ class ChatServer(threading.Thread):
             client_socket_ssl, client_address = self.server_socket_ssl.accept()
             client_thread = threading.Thread(target=self.handle_client, args=(client_socket_ssl,))
             client_thread.start()
-            self.clients.append(client_socket_ssl)
+            self.clients[client_socket_ssl] = None  # add client to dictionary
             logging.info(f'New client connected from {client_address}')
             
     def handle_client(self, client_socket_ssl):
@@ -48,8 +50,11 @@ class ChatServer(threading.Thread):
                     if message.startswith('/logout'):
                         self.logout_user(client_socket_ssl)
                         break
+                    elif message.startswith('/msg'):
+                        message = message[5:].strip()
+                        self.broadcast(message, client_socket_ssl)  
                     else:
-                        self.broadcast(message, client_socket_ssl)
+                        client_socket_ssl.send('Invalid command. Please enter a valid command.'.encode('utf-8'))
                 else:
                     if message.startswith('/register'):
                         match = re.match(r'^/register (\S+) (\S+)$', message)
@@ -67,16 +72,20 @@ class ChatServer(threading.Thread):
                         public_key_b64 = message.split(maxsplit=1)[1]
                         public_key_bytes = base64.b64decode(public_key_b64)
                         public_key = x25519.X25519PublicKey.from_public_bytes(public_key_bytes)
+                        self.clients[client_socket_ssl] = public_key
                         logging.info(f'Public key received from {client_socket_ssl.getpeername()}: {public_key.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo)}')
                     else:
                         client_socket_ssl.send('You must be authenticated to send messages. Please log in or register.'.encode('utf-8'))
             except:
-                del self.authenticated_clients[client_socket_ssl]
-                self.clients.remove(client_socket_ssl)
+                if client_socket_ssl in self.authenticated_clients:
+                    del self.authenticated_clients[client_socket_ssl]
+                if client_socket_ssl in self.clients:
+                    del self.clients[client_socket_ssl]
                 break
+        logging.info(f'Client Disconnected: {client_socket_ssl.getpeername()}')
                 
     def broadcast(self, message, client_socket_ssl):
-        username = self.authenticated_clients[client_socket_ssl]
+        username = self.authenticated_clients[client_socket_ssl]['username']
         failed_clients = []
         for authenticated_client_socket_ssl in self.authenticated_clients.keys():
             if authenticated_client_socket_ssl != client_socket_ssl:
@@ -94,7 +103,6 @@ class ChatServer(threading.Thread):
     def logout_user(self, client_socket_ssl):
         username = self.authenticated_clients[client_socket_ssl]
         del self.authenticated_clients[client_socket_ssl]
-        self.clients.remove(client_socket_ssl)
         logging.info(f'User Logged Out: {username}')
         client_socket_ssl.send('You have been logged out.'.encode('utf-8'))
     
@@ -107,8 +115,10 @@ class ChatServer(threading.Thread):
         
     def authenticate_user(self, username, password, client_socket_ssl):
         if self.database.authenticate_user(username, password):
+            public_key = self.clients[client_socket_ssl]
+            self.authenticated_clients[client_socket_ssl] = {'username': username, 'public_key': public_key}
+            del self.clients[client_socket_ssl]
             client_socket_ssl.send('User logged in.'.encode('utf-8'))
-            self.authenticated_clients[client_socket_ssl] = username
             logging.info(f'User Logged In: {username}')
         else:
             client_socket_ssl.send('Invalid username or password.'.encode('utf-8'))
