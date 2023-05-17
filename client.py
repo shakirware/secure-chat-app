@@ -37,7 +37,9 @@ class ChatClient:
         self.socket.connect((self.host, self.port))
 
     def send_message(self, recipient_username, message):
-        # recieve recipients public key
+        shared_key = derive_encryption_key(self.private_key, self.shared_public_keys[recipient_username])
+        logging.info(f"Shared key = {shared_key.hex()}")
+        
         data = {
             'type': 'message',
             'sender': self.username,
