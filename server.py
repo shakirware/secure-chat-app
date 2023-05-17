@@ -59,7 +59,7 @@ class ChatServer(threading.Thread):
                 else:
                     self.handle_unauthenticated_message(message, client_socket_ssl)
             except:
-                #traceback.print_exc()
+                traceback.print_exc()
                 logging.info(f'Client Disconnected {client_socket_ssl.getpeername()}')
                 if client_socket_ssl in self.authenticated_clients:
                     del self.authenticated_clients[client_socket_ssl]
@@ -124,7 +124,9 @@ class ChatServer(threading.Thread):
             self.authenticated_clients[username] = {'socket': client_socket_ssl, 'public_key': self.unauthenticated_clients[client_socket_ssl]}
             del self.unauthenticated_clients[client_socket_ssl]
             self.send_message_from_server(f'Login successful. Welcome {username}', client_socket_ssl)
-            logging.info(f'User Logged In: {username}')
+            self.broadcast_public_keys()
+            logging.info(f'User {username} authentication successful')
+            logging.info(f'Distributing public keys.')
         else:
             self.send_message_from_server('The provided username or password is invalid. Please verify your credentials and try again.', client_socket_ssl)
             logging.info(f'Invalid Login')
@@ -171,7 +173,29 @@ class ChatServer(threading.Thread):
         json_data = json.dumps(data)
         recipient_socket_ssl.send(json_data.encode('utf-8'))
         
-     
+    def send_public_key(self, public_key, owner, recipient_socket_ssl):
+        public_key_raw = public_key.public_bytes(
+            encoding=Encoding.Raw, format=PublicFormat.Raw)
+        public_key_b64 = base64.b64encode(public_key_raw).decode('utf-8')
+        data = {
+            'type': 'public_key',
+            'owner': owner,
+            'public_key': public_key_b64
+        }
+        json_data = json.dumps(data)
+        recipient_socket_ssl.send(json_data.encode('utf-8'))
+        
+    def broadcast_public_keys(self):
+        for public_key_username, client_data in self.authenticated_clients.items():
+            client_socket_ssl = client_data['socket']
+            public_key = client_data['public_key']
+            
+            for recipient_username, recipient_client_data in self.authenticated_clients.items():
+                if recipient_username != public_key_username:
+                    recipient_socket_ssl = recipient_client_data['socket']
+                    self.send_public_key(public_key, public_key_username, recipient_socket_ssl)
+            
+
     def run(self):
         self.setup_server()
         self.run_server()

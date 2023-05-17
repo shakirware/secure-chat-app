@@ -10,6 +10,7 @@ import sys
 from queue import Queue, Empty
 from cryptography.hazmat.primitives import serialization
 from x25519_key_exchange import generate_key_pair, derive_encryption_key
+from cryptography.hazmat.primitives.asymmetric import x25519
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 CERT_FILE = './certs/server.crt'
@@ -36,6 +37,7 @@ class ChatClient:
         self.socket.connect((self.host, self.port))
 
     def send_message(self, recipient_username, message):
+        # recieve recipients public key
         data = {
             'type': 'message',
             'sender': self.username,
@@ -82,10 +84,22 @@ class ChatClient:
                 if not message:
                     break
                 logging.info('Received message: %s', message)
+                
+                data = json.loads(message)
+                if data['type'] == 'public_key':
+                    self.handle_public_key(data)
+                    
             except socket.error as error:
                 logging.error(
                     'Error occurred while receiving messages: %s', error)
                 break
+                
+    def handle_public_key(self, data):
+        public_key_b64 = data['public_key']
+        public_key_bytes = base64.b64decode(public_key_b64)
+        public_key = x25519.X25519PublicKey.from_public_bytes(public_key_bytes)
+        owner = data.get('owner')
+        self.shared_public_keys[owner] = public_key
 
     def send_messages(self):
         while self.is_running:
