@@ -11,6 +11,9 @@ from queue import Queue, Empty
 from cryptography.hazmat.primitives import serialization
 from x25519_key_exchange import generate_key_pair, derive_encryption_key
 from cryptography.hazmat.primitives.asymmetric import x25519
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.backends import default_backend
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 CERT_FILE = './certs/server.crt'
@@ -22,6 +25,7 @@ class ChatClient:
         self.cert_file = cert_file
         self.private_key, self.public_key = generate_key_pair()
         self.shared_public_keys = {}
+        self.message_keys = {}
         self.message_queue = Queue()
         self.socket = None
         self.context = None
@@ -37,8 +41,11 @@ class ChatClient:
         self.socket.connect((self.host, self.port))
 
     def send_message(self, recipient_username, message):
-        shared_key = derive_encryption_key(self.private_key, self.shared_public_keys[recipient_username])
-        logging.info(f"Shared key = {shared_key.hex()}")
+        if recipient_username not in self.shared_public_keys:
+            logging.info(f"Unable to retrieve the public key for the user {recipient_username}.")
+            return
+            
+        message_key = self.generate_message_key(recipient_username)
         
         data = {
             'type': 'message',
@@ -49,7 +56,28 @@ class ChatClient:
         }
         json_message = json.dumps(data)
         self.message_queue.put(json_message)
-
+        logging.info('You: %s', message)
+        
+    def generate_message_key(self, username):
+        if username not in self.message_keys:
+            # get shared secret to make message key
+            key = derive_encryption_key(self.private_key, self.shared_public_keys[username])
+            logging.info(f"DH Shared Secret = {key.hex()}.")
+        else:
+            key = self.message_keys[username]
+            
+        hkdf = HKDF(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=None,
+        info=None,
+        backend=default_backend()
+        )
+        new_key = hkdf.derive(key)
+        logging.info(f"Message key = {new_key.hex()}.")
+        self.message_keys[username] = new_key
+        return new_key 
+        
     def send_public_key(self):
         public_key_raw = self.public_key.public_bytes(
             encoding=serialization.Encoding.Raw, format=serialization.PublicFormat.Raw)
@@ -85,16 +113,34 @@ class ChatClient:
                 message = self.socket.recv(1024).decode()
                 if not message:
                     break
-                logging.info('Received message: %s', message)
                 
                 data = json.loads(message)
-                if data['type'] == 'public_key':
-                    self.handle_public_key(data)
+                
+                message_type = data.get('type')
+                message_handlers = {
+                    'public_key': self.handle_public_key,
+                    'message': self.handle_message_user
+                }
+                
+                handler = message_handlers.get(message_type)
+                
+                if handler:
+                    handler(data)
+                else:
+                    logging.info('Received message: %s', message)
                     
             except socket.error as error:
                 logging.error(
                     'Error occurred while receiving messages: %s', error)
                 break
+                
+    def handle_message_user(self, data):
+        sender = data.get('sender')
+        message = data.get('message')
+        # message key for decryption
+        message_key = self.generate_message_key(sender)
+        logging.info('%s: %s', sender, message)
+        
                 
     def handle_public_key(self, data):
         public_key_b64 = data['public_key']
@@ -109,7 +155,6 @@ class ChatClient:
                 json_message = self.message_queue.get(timeout=1)
                 self.socket.send(json_message.encode())
                 self.message_queue.task_done()
-                logging.info('Sent message: %s', json_message)
             except socket.error as error:
                 logging.error(
                     'Error occurred while receiving messages: %s', error)
