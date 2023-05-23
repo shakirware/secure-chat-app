@@ -59,7 +59,7 @@ class ChatServer(threading.Thread):
                 else:
                     self.handle_unauthenticated_message(message, client_socket_ssl)
             except:
-                traceback.print_exc()
+                #traceback.print_exc()
                 logging.info(f'Client Disconnected {client_socket_ssl.getpeername()}')
                 if client_socket_ssl in self.authenticated_clients:
                     del self.authenticated_clients[client_socket_ssl]
@@ -147,11 +147,10 @@ class ChatServer(threading.Thread):
         sender = socket_to_username.get(client_socket_ssl)
         recipient = data.get('recipient')
         message_b64 = data.get('message')
-        message = base64.b64decode(message_b64).decode('utf-8')
         
         if recipient in self.authenticated_clients:
             recipient_socket_ssl = self.authenticated_clients[recipient]['socket']
-            self.send_message(sender, recipient, message, recipient_socket_ssl)
+            self.send_message(sender, recipient, message_b64, recipient_socket_ssl)
     
     def send_message(self, sender, recipient, message, recipient_socket_ssl):
         data = {

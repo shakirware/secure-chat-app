@@ -1,3 +1,4 @@
+# add message timestamps then implement the AES encryption lol
 import socket
 import ssl
 import threading
@@ -6,6 +7,7 @@ import json
 import time
 import logging
 import sys
+import os
 
 from queue import Queue, Empty
 from cryptography.hazmat.primitives import serialization
@@ -14,12 +16,14 @@ from cryptography.hazmat.primitives.asymmetric import x25519
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives import padding
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 CERT_FILE = './certs/server.crt'
 
 class ChatClient:
-    def __init__(self, host, port, cert_file):
+    def __init__(self, host, port, cert_file, using_flask=False):
         self.host = host
         self.port = port
         self.cert_file = cert_file
@@ -31,6 +35,7 @@ class ChatClient:
         self.context = None
         self.username = None
         self.is_running = True
+        self.using_flask = using_flask
 
     def connect(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -47,11 +52,23 @@ class ChatClient:
             
         message_key = self.generate_message_key(recipient_username)
         
+        iv = os.urandom(16)
+        cipher = Cipher(algorithms.AES(message_key), modes.CBC(iv), backend=default_backend())
+        encryptor = cipher.encryptor()
+        
+        padder = padding.PKCS7(128).padder()
+        padded_data = padder.update(message.encode('utf-8')) + padder.finalize()
+        
+        encrypted_message = encryptor.update(padded_data) + encryptor.finalize()
+        encrypted_message_with_iv = iv + encrypted_message
+        
+        encrypted_message_b64 = base64.b64encode(encrypted_message_with_iv).decode('utf-8')
+        
         data = {
             'type': 'message',
             'sender': self.username,
             'recipient': recipient_username,
-            'message': base64.b64encode(message.encode('utf-8')).decode('utf-8'),
+            'message': encrypted_message_b64,
             'timestamp': int(time.time())
         }
         json_message = json.dumps(data)
@@ -119,7 +136,8 @@ class ChatClient:
                 message_type = data.get('type')
                 message_handlers = {
                     'public_key': self.handle_public_key,
-                    'message': self.handle_message_user
+                    'message': self.handle_message_user,
+                    'server': self.handle_message_server
                 }
                 
                 handler = message_handlers.get(message_type)
@@ -127,18 +145,35 @@ class ChatClient:
                 if handler:
                     handler(data)
                 else:
-                    logging.info('Received message: %s', message)
+                    logging.info('Received message: %s', data)
                     
             except socket.error as error:
                 logging.error(
                     'Error occurred while receiving messages: %s', error)
                 break
                 
+    def handle_message_server(self, data):
+        message = data.get('message')
+        logging.info('SERVER: %s', message)
+                
     def handle_message_user(self, data):
         sender = data.get('sender')
-        message = data.get('message')
-        # message key for decryption
+        message_b64 = data.get('message')
+        
+        encrypted_message_with_iv = base64.b64decode(message_b64)
+        iv = encrypted_message_with_iv[:16]
+        encrypted_message = encrypted_message_with_iv[16:]
+
         message_key = self.generate_message_key(sender)
+        
+        cipher = Cipher(algorithms.AES(message_key), modes.CBC(iv), backend=default_backend())
+        decryptor = cipher.decryptor()
+        decrypted_message = decryptor.update(encrypted_message) + decryptor.finalize()
+
+        unpadder = padding.PKCS7(128).unpadder()
+        unpadded_data = unpadder.update(decrypted_message) + unpadder.finalize()
+        message = unpadded_data.decode('utf-8')
+        
         logging.info('%s: %s', sender, message)
         
                 
@@ -148,6 +183,7 @@ class ChatClient:
         public_key = x25519.X25519PublicKey.from_public_bytes(public_key_bytes)
         owner = data.get('owner')
         self.shared_public_keys[owner] = public_key
+        logging.info('The public key provided by user %s has been successfully received and stored.', owner)
 
     def send_messages(self):
         while self.is_running:
