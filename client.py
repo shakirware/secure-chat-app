@@ -1,3 +1,4 @@
+# functionality for status codes.
 import socket
 import ssl
 import threading
@@ -10,7 +11,7 @@ import os
 
 from queue import Queue, Empty
 from cryptography.hazmat.primitives import serialization
-from x25519_key_exchange import generate_key_pair, derive_encryption_key
+from modules.x25519_key_exchange import generate_key_pair, derive_encryption_key
 from cryptography.hazmat.primitives.asymmetric import x25519
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives import hashes
@@ -161,12 +162,10 @@ class ChatClient:
         status_code = data.get('status_code')
         
         if status_code is not None:
-            #if self.web_interface:
-            #    self.web_interface.handle_login_response(error_code)
+            if status_code in [1001, 1002] and self.web_interface:
+                self.web_interface.handle_login_response(status_code)
             logging.info('SERVER: Status Code %s ', status_code)
         else:
-            #if self.web_interface:
-            #    self.web_interface.handle_login_response(flag)
             logging.info('SERVER: %s', message)
         
                 

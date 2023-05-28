@@ -1,6 +1,5 @@
 # potentially add token for each user logged in to send with each message to server.
 # add token for login authentication.
-#fix file structures.
 import threading
 import socket
 import ssl
@@ -13,15 +12,15 @@ import time
 import sys
 
 from json.decoder import JSONDecodeError
-from database import ChatDatabase
+from modules.database import ChatDatabase
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PublicKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
-from status_codes import StatusCode
+from modules.status_codes import StatusCode
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 
 MAX_CLIENTS = 5
-DATABASE_FILE = 'chat.db'
+DATABASE_FILE = './storage/chat.db'
 
 class ChatServer(threading.Thread):
     def __init__(self, host, port, certfile, keyfile):

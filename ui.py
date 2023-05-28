@@ -67,10 +67,8 @@ class ChatWebInterface:
         #if len(self.messages) > MAX_MESSAGES:
         #    self.messages = self.messages[-MAX_MESSAGES:]
 
-            
-        
-    def handle_login_response(self, flag):
-        if flag == 1:
+    def handle_login_response(self, status_code):
+        if status_code == 1002:
             self.login_successful = True
         else:
             self.login_successful = False
