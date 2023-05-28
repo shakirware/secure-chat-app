@@ -21,22 +21,4 @@ def derive_encryption_key(private_key, peer_public_key, salt=None, info=None, le
     return hkdf.derive(shared_secret)
     
     
-    
-"""
-key_exchange = X25519KeyExchange()
-
-# Party A generates a key pair
-private_key_a, public_key_a = key_exchange.generate_key_pair()
-
-# Party B generates a key pair
-private_key_b, public_key_b = key_exchange.generate_key_pair()
-
-# Party A derives the shared secret
-shared_secret_a = private_key_a.exchange(public_key_b)
-
-# Party B derives the shared secret
-shared_secret_b = private_key_b.exchange(public_key_a)
-
-# Both parties derive the encryption key
-encryption_key_a = key_exchange.derive_encryption_key(private_key_a, public_key_b)
-encryption_key_b = key_exchange.derive_encryption_key(private_key_b, public_key_a)"""
+   

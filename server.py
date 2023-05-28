@@ -1,5 +1,3 @@
-# potentially add token for each user logged in to send with each message to server.
-# add token for login authentication.
 import threading
 import socket
 import ssl
@@ -14,8 +12,12 @@ import sys
 from json.decoder import JSONDecodeError
 from modules.database import ChatDatabase
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PublicKey
-from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat, load_pem_public_key
+from cryptography.hazmat.primitives.asymmetric import rsa, padding
+from cryptography.hazmat.primitives import hashes
+from cryptography.fernet import Fernet
 from modules.status_codes import StatusCode
+from cryptography.hazmat.backends import default_backend
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 
@@ -47,7 +49,7 @@ class ChatServer(threading.Thread):
             client_socket_ssl, client_address = self.server_socket_ssl.accept()
             client_thread = threading.Thread(target=self.handle_client, args=(client_socket_ssl,))
             client_thread.start()
-            self.unauthenticated_clients[client_socket_ssl] = None  
+            self.unauthenticated_clients[client_socket_ssl] = {'rsa_public_key': None,  'x25519_public_key': None} 
             logging.info(f'New client connected from {client_address}.')
 
     def get_username_from_socket(self, client_socket_ssl):
@@ -64,6 +66,7 @@ class ChatServer(threading.Thread):
                 message = client_socket_ssl.recv(1024).decode('utf-8')
                 if not message:
                     raise ValueError("Received an empty message.")
+                    
                 sockets = [client_data['socket'] for client_data in self.authenticated_clients.values()]
                 if client_socket_ssl in sockets:
                     self.handle_authenticated_message(message, client_socket_ssl)
@@ -103,7 +106,8 @@ class ChatServer(threading.Thread):
         message_handlers = {
             'register': self.handle_register,
             'login': self.handle_login,
-            'public_key': self.handle_public_key,
+            'public_key_x25519': self.handle_public_key_x25519,
+            'public_key_rsa': self.handle_public_key_rsa
         }
         handler = message_handlers.get(message_type)
         if handler:
@@ -112,12 +116,21 @@ class ChatServer(threading.Thread):
             self.send_status_response(StatusCode.INVALID_MESSAGE_TYPE, client_socket_ssl)
             logging.info(f'Received an invalid message type: {message_type}.')
      
-    def handle_public_key(self, data, client_socket_ssl):
+    def handle_public_key_x25519(self, data, client_socket_ssl):
         base64_encoded_public_key = data.get('public_key')
         public_key_bytes = base64.b64decode(base64_encoded_public_key)
         public_key = X25519PublicKey.from_public_bytes(public_key_bytes)
-        self.unauthenticated_clients[client_socket_ssl] = public_key
+        self.unauthenticated_clients[client_socket_ssl].update({'x25519_public_key': public_key})
         public_key_pem = public_key.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo)
+        peer_address = client_socket_ssl.getpeername()
+        logging.info(f'Public key received from {peer_address}: {public_key_pem}.')
+        
+    def handle_public_key_rsa(self, data, client_socket_ssl):
+        base64_encoded_public_key = data.get('public_key')
+        public_key_bytes = base64.b64decode(base64_encoded_public_key)
+        public_key = load_pem_public_key(public_key_bytes, backend=default_backend())
+        self.unauthenticated_clients[client_socket_ssl].update({'rsa_public_key': public_key})
+        public_key_pem = public_key.public_bytes(encoding=Encoding.PEM, format=PublicFormat.SubjectPublicKeyInfo)
         peer_address = client_socket_ssl.getpeername()
         logging.info(f'Public key received from {peer_address}: {public_key_pem}.')
      
@@ -137,11 +150,39 @@ class ChatServer(threading.Thread):
             logging.info("Authentication failed: Invalid login.")
     
     def authenticate_user(self, username, client_socket_ssl):
-        self.authenticated_clients[username] = {'socket': client_socket_ssl, 'public_key': self.unauthenticated_clients[client_socket_ssl]}
+        
+        rsa_public_key = self.unauthenticated_clients[client_socket_ssl]['rsa_public_key']
+        x25519_public_key = self.unauthenticated_clients[client_socket_ssl]['x25519_public_key']
+        
         del self.unauthenticated_clients[client_socket_ssl]
         self.send_status_response(StatusCode.LOGIN_SUCCESSFUL, client_socket_ssl)
-        self.broadcast_public_keys()
+
+        # generate token
+        token = Fernet.generate_key() 
+        self.authenticated_clients[username] = {'socket': client_socket_ssl, 'rsa_public_key': rsa_public_key, 'x25519_public_key': x25519_public_key, 'token': token}
+        logging.info(f'token = {token}')
+        encrypted_token = rsa_public_key.encrypt(
+        token,
+        padding.OAEP(
+            mgf=padding.MGF1(algorithm=hashes.SHA256()),
+            algorithm=hashes.SHA256(),
+            label=None
+            )
+        )
+        self.send_token(encrypted_token, client_socket_ssl)
+        self.broadcast_x25519_public_keys()
         self.send_notification(f'User {username} has logged in.')
+    
+    def send_token(self, token, recipient_socket_ssl):
+        token_b64 = base64.b64encode(token).decode('utf-8')
+        data = {
+            'type': 'token',
+            'token': token_b64,
+            'timestamp': int(time.time())
+        }
+        json_data = json.dumps(data)
+        recipient_socket_ssl.send(json_data.encode('utf-8'))    
+        
         
     def handle_register(self, data, client_socket_ssl):
         username = data.get('username')
@@ -157,11 +198,16 @@ class ChatServer(threading.Thread):
     def handle_message_user(self, data, client_socket_ssl):
         socket_to_username = {client_data['socket']: username for username, client_data in self.authenticated_clients.items()}
         sender = socket_to_username.get(client_socket_ssl)
+        token_b64 = data.get('token')
+        token = base64.b64decode(token_b64)
         recipient = data.get('recipient')
         message_b64 = data.get('message')
         if recipient in self.authenticated_clients:
             recipient_socket_ssl = self.authenticated_clients[recipient]['socket']
-            self.send_message(sender, recipient, message_b64, recipient_socket_ssl)
+            if token == self.authenticated_clients[sender]['token']:
+                self.send_message(sender, recipient, message_b64, recipient_socket_ssl)
+            else:
+                logging.info(f"Invalid token from {sender}.")
     
     def send_message(self, sender, recipient, message, recipient_socket_ssl):
         data = {
@@ -210,10 +256,10 @@ class ChatServer(threading.Thread):
         json_data = json.dumps(data)
         recipient_socket_ssl.send(json_data.encode('utf-8'))
         
-    def broadcast_public_keys(self):
+    def broadcast_x25519_public_keys(self):
         for public_key_username, client_data in self.authenticated_clients.items():
             client_socket_ssl = client_data['socket']
-            public_key = client_data['public_key']
+            public_key = client_data['x25519_public_key']
             
             for recipient_username, recipient_client_data in self.authenticated_clients.items():
                 if recipient_username != public_key_username:
