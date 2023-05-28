@@ -1,5 +1,3 @@
-# functionality for status codes.
-# reset key if other user logs out.
 import socket
 import ssl
 import threading
@@ -195,13 +193,29 @@ class ChatClient:
     def handle_message_server(self, data):
         message = data.get('message')
         status_code = data.get('status_code')
-        
-        if status_code is not None:
-            if status_code in [1001, 1002] and self.web_interface:
-                self.web_interface.handle_login_response(status_code)
-            logging.info('SERVER: Status Code %s ', status_code)
-        else:
+    
+        if status_code is None:
             logging.info('SERVER: %s', message)
+            return
+    
+        if status_code == 1001 or status_code == 1002:
+            # Login response
+            if self.web_interface:
+                self.web_interface.handle_login_response(status_code)
+            if status_code == 1002:
+                logging.info(f'SERVER {status_code}: Logged in successfully.')
+        elif status_code == 1009:
+            # User logged out
+            username = message
+            if self.message_keys.get(username):
+                del self.message_keys[username]
+            logging.info(f"SERVER {status_code}: User '{username}' logged out. Message Keys for {username} deleted.")
+        elif status_code == 1010:
+            # User logged in
+            username = message
+            logging.info(f"SERVER {status_code}: User '{username}' logged in.")
+        else:
+            logging.info(f'SERVER: Status Code {status_code}')
         
                 
     def handle_message_user(self, data):

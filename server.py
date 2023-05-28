@@ -81,7 +81,7 @@ class ChatServer(threading.Thread):
                     del self.unauthenticated_clients[client_socket_ssl]
                 
                 if username is not None:
-                    self.send_notification(f'User {username} has logged out.') 
+                    self.alert_all_users(StatusCode.USER_LOGGED_OUT, f'{username}')
                 
                 logging.info(f"Client disconnected. Peer address: {client_socket_ssl.getpeername()}.")
                 is_running = False
@@ -171,7 +171,7 @@ class ChatServer(threading.Thread):
         )
         self.send_token(encrypted_token, client_socket_ssl)
         self.broadcast_x25519_public_keys()
-        self.send_notification(f'User {username} has logged in.')
+        self.alert_all_users(StatusCode.USER_LOGGED_IN, f'{username}')
     
     def send_token(self, token, recipient_socket_ssl):
         token_b64 = base64.b64encode(token).decode('utf-8')
@@ -219,30 +219,21 @@ class ChatServer(threading.Thread):
         }
         json_data = json.dumps(data)
         recipient_socket_ssl.send(json_data.encode('utf-8'))
-        
-    def send_response(self, message, recipient_socket_ssl):
+                    
+    def send_status_response(self, status_code, recipient_socket_ssl, message=None):
         data = {
             'type': 'server',
             'message': message,
-            'timestamp': int(time.time())
-        }
-        json_data = json.dumps(data)
-        recipient_socket_ssl.send(json_data.encode('utf-8'))
-            
-    def send_status_response(self, status_code, recipient_socket_ssl):
-        data = {
-            'type': 'server',
             'status_code': status_code,
             'timestamp': int(time.time())
         }
         json_data = json.dumps(data)
         recipient_socket_ssl.send(json_data.encode('utf-8'))
     
-    def send_notification(self, message):
+    def alert_all_users(self, status_code, message):
         for username, client_data in self.authenticated_clients.items():
             client_socket_ssl = client_data['socket']
-            self.send_response(message, client_socket_ssl)
-        
+            self.send_status_response(status_code, client_socket_ssl, message)    
         
     def send_public_key(self, public_key, owner, recipient_socket_ssl):
         public_key_raw = public_key.public_bytes(
