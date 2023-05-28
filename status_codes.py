@@ -1,4 +1,4 @@
-class ErrorCode:
+class StatusCode:
     INVALID_LOGIN = 1001
     LOGIN_SUCCESSFUL = 1002
     USERNAME_IN_USE = 1003

@@ -1,4 +1,3 @@
-#self.username unused
 import socket
 import ssl
 import threading
@@ -159,12 +158,12 @@ class ChatClient:
                 
     def handle_message_server(self, data):
         message = data.get('message')
-        error_code = data.get('error_code')
+        status_code = data.get('status_code')
         
-        if error_code is not None:
+        if status_code is not None:
             #if self.web_interface:
             #    self.web_interface.handle_login_response(error_code)
-            logging.info('SERVER: Error code %s ', error_code)
+            logging.info('SERVER: Status Code %s ', status_code)
         else:
             #if self.web_interface:
             #    self.web_interface.handle_login_response(flag)
