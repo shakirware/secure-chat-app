@@ -1,4 +1,4 @@
-# add message timestamps then implement the AES encryption lol
+#self.username unused
 import socket
 import ssl
 import threading
@@ -23,7 +23,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(me
 CERT_FILE = './certs/server.crt'
 
 class ChatClient:
-    def __init__(self, host, port, cert_file, using_flask=False):
+    def __init__(self, host, port, cert_file, web_interface=None):
         self.host = host
         self.port = port
         self.cert_file = cert_file
@@ -35,7 +35,7 @@ class ChatClient:
         self.context = None
         self.username = None
         self.is_running = True
-        self.using_flask = using_flask
+        self.web_interface = web_interface
 
     def connect(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -133,6 +133,7 @@ class ChatClient:
                 
                 data = json.loads(message)
                 
+                
                 message_type = data.get('type')
                 message_handlers = {
                     'public_key': self.handle_public_key,
@@ -143,9 +144,13 @@ class ChatClient:
                 handler = message_handlers.get(message_type)
                 
                 if handler:
+                    if self.web_interface:
+                        self.web_interface.update_chat_interface(data)
                     handler(data)
                 else:
                     logging.info('Received message: %s', data)
+                    
+        
                     
             except socket.error as error:
                 logging.error(
@@ -154,7 +159,17 @@ class ChatClient:
                 
     def handle_message_server(self, data):
         message = data.get('message')
-        logging.info('SERVER: %s', message)
+        error_code = data.get('error_code')
+        
+        if error_code is not None:
+            #if self.web_interface:
+            #    self.web_interface.handle_login_response(error_code)
+            logging.info('SERVER: Error code %s ', error_code)
+        else:
+            #if self.web_interface:
+            #    self.web_interface.handle_login_response(flag)
+            logging.info('SERVER: %s', message)
+        
                 
     def handle_message_user(self, data):
         sender = data.get('sender')
@@ -173,6 +188,11 @@ class ChatClient:
         unpadder = padding.PKCS7(128).unpadder()
         unpadded_data = unpadder.update(decrypted_message) + unpadder.finalize()
         message = unpadded_data.decode('utf-8')
+        
+        if self.web_interface:
+            d = data.copy()
+            d['message'] = message
+            self.web_interface.update_chat_interface(d)
         
         logging.info('%s: %s', sender, message)
         
