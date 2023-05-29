@@ -1,3 +1,5 @@
+# list to select who u want to message
+# add registration form
 import threading
 import os
 import time

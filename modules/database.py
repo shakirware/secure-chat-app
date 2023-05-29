@@ -1,5 +1,7 @@
 import sqlite3
 import hashlib
+import random
+import string
 
 
 class ChatDatabase:
@@ -10,12 +12,13 @@ class ChatDatabase:
         with sqlite3.connect(self.db_file) as conn:
             c = conn.cursor()
             c.execute(
-                "CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, password TEXT)")
+                "CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, salt TEXT, password TEXT)")
+            salt = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
             hashed_password = hashlib.sha256(
-                password.encode('utf-8')).hexdigest()
+                (salt + password).encode('utf-8')).hexdigest()
             try:
-                c.execute("INSERT INTO users VALUES (?, ?)",
-                          (username, hashed_password))
+                c.execute("INSERT INTO users VALUES (?, ?, ?)",
+                          (username, salt, hashed_password))
                 conn.commit()
                 return True
             except sqlite3.IntegrityError:
@@ -24,11 +27,13 @@ class ChatDatabase:
     def authenticate_user(self, username, password):
         with sqlite3.connect(self.db_file) as conn:
             c = conn.cursor()
-            hashed_password = hashlib.sha256(
-                password.encode('utf-8')).hexdigest()
-            c.execute("SELECT * FROM users WHERE username=? AND password=?",
-                      (username, hashed_password))
-            if c.fetchone() is not None:
-                return True
-            else:
-                return False
+            c.execute("SELECT salt, password FROM users WHERE username=?",
+                      (username,))
+            result = c.fetchone()
+            if result is not None:
+                salt, hashed_password = result
+                input_hashed_password = hashlib.sha256(
+                    (salt + password).encode('utf-8')).hexdigest()
+                if input_hashed_password == hashed_password:
+                    return True
+            return False

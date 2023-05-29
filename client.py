@@ -1,4 +1,5 @@
 # maybe a class store keys
+# group chat functionality ?
 import base64
 import json
 import logging

@@ -1,4 +1,5 @@
 # config to store constants
+# tell each user who is online when you log in
 import logging
 import socket
 import ssl
