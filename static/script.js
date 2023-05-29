@@ -16,8 +16,12 @@
             // Iterate through the messages and add them to the list
             messages.forEach(message => {
 				console.log(message)
+				
 				const sender = message.sender;
 				const content = message.message;
+				const timestamp = message.timestamp;
+				const date = new Date(timestamp * 1000);
+				const readableTime = date.toLocaleString();
 			
 				// Create message elements
 				const messageDiv = document.createElement('div');
@@ -25,7 +29,7 @@
 
 				const senderDiv = document.createElement('div');
 				senderDiv.classList.add('sender');
-				senderDiv.innerHTML = `<p>${sender}:</p>`;
+				senderDiv.innerHTML = `<p>${readableTime}</p><p>${sender}:</p>`;
 
 				const contentDiv = document.createElement('div');
 				contentDiv.classList.add('content');
@@ -37,6 +41,9 @@
 
 				// Append message div to the message container
 				messageContainer.appendChild(messageDiv);
+				
+				const chatBox = document.querySelector('.chat-box');
+				chatBox.scrollTop = chatBox.scrollHeight;
             });
         }
 

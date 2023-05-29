@@ -1,28 +1,30 @@
-import socket
-import ssl
-import threading
+# maybe a class store keys
 import base64
 import json
-import time
 import logging
-import sys
 import os
+import socket
+import ssl
+import sys
+import threading
+import time
 
 from queue import Queue, Empty
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.hazmat.primitives.asymmetric import padding
-from modules.x25519_key_exchange import generate_key_pair, derive_encryption_key
-from modules.rsa_key_generator import generate_rsa_key_pair
-from cryptography.hazmat.primitives.asymmetric import x25519
-from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import x25519, padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.padding import PKCS7
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
-CERT_FILE = './certs/server.crt'
+from modules.rsa_key_generator import generate_rsa_key_pair
+from modules.status_codes import StatusCode
+from modules.x25519_key_exchange import generate_key_pair, derive_encryption_key
+from config.server_config import *
+
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s [%(levelname)s] %(message)s')
 
 class ChatClient:
     def __init__(self, host, port, cert_file, web_interface=None):
@@ -35,6 +37,7 @@ class ChatClient:
         self.message_keys = {}
         self.message_queue = Queue()
         self.socket = None
+        self.token = None
         self.context = None
         self.username = None
         self.is_running = True
@@ -50,25 +53,30 @@ class ChatClient:
 
     def send_message(self, recipient_username, message):
         if recipient_username not in self.shared_public_keys:
-            logging.info(f"Unable to retrieve the public key for the user {recipient_username}.")
+            logging.info(
+                "Unable to retrieve the public key for the user %s.", recipient_username)
             return
-            
+
         message_key = self.generate_message_key(recipient_username)
-        
+
         iv = os.urandom(16)
-        cipher = Cipher(algorithms.AES(message_key), modes.CBC(iv), backend=default_backend())
+        cipher = Cipher(algorithms.AES(message_key),
+                        modes.CBC(iv), backend=default_backend())
         encryptor = cipher.encryptor()
-        
+
         padder = PKCS7(128).padder()
-        padded_data = padder.update(message.encode('utf-8')) + padder.finalize()
-        
-        encrypted_message = encryptor.update(padded_data) + encryptor.finalize()
+        padded_data = padder.update(
+            message.encode('utf-8')) + padder.finalize()
+
+        encrypted_message = encryptor.update(
+            padded_data) + encryptor.finalize()
         encrypted_message_with_iv = iv + encrypted_message
-        
-        encrypted_message_b64 = base64.b64encode(encrypted_message_with_iv).decode('utf-8')
-        
+
+        encrypted_message_b64 = base64.b64encode(
+            encrypted_message_with_iv).decode('utf-8')
+
         token_b64 = base64.b64encode(self.token).decode('utf-8')
-        
+
         data = {
             'type': 'message',
             'sender': self.username,
@@ -80,27 +88,27 @@ class ChatClient:
         json_message = json.dumps(data)
         self.message_queue.put(json_message)
         logging.info('You: %s', message)
-        
+
     def generate_message_key(self, username):
         if username not in self.message_keys:
-            # get shared secret to make message key
-            key = derive_encryption_key(self.x25519_private_key, self.shared_public_keys[username])
-            logging.info(f"DH Shared Secret = {key.hex()}.")
+            key = derive_encryption_key(
+                self.x25519_private_key, self.shared_public_keys[username])
+            logging.info("DH Shared Secret = %s.", key.hex())
         else:
             key = self.message_keys[username]
-            
+
         hkdf = HKDF(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=None,
-        info=None,
-        backend=default_backend()
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=None,
+            info=None,
+            backend=default_backend()
         )
         new_key = hkdf.derive(key)
-        logging.info(f"Message key = {new_key.hex()}.")
+        logging.info("Message key = %s.", new_key.hex())
         self.message_keys[username] = new_key
-        return new_key 
-        
+        return new_key
+
     def send_x25519_public_key(self):
         public_key_raw = self.x25519_public_key.public_bytes(
             encoding=serialization.Encoding.Raw, format=serialization.PublicFormat.Raw)
@@ -111,11 +119,11 @@ class ChatClient:
         }
         json_message = json.dumps(data)
         self.message_queue.put(json_message)
-        
+
     def send_rsa_public_key(self):
         public_key_bytes = self.rsa_public_key.public_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo
         )
         public_key_b64 = base64.b64encode(public_key_bytes).decode('utf-8')
         data = {
@@ -123,7 +131,7 @@ class ChatClient:
             'public_key': public_key_b64
         }
         json_message = json.dumps(data)
-        self.message_queue.put(json_message)    
+        self.message_queue.put(json_message)
 
     def send_login_request(self, username, password):
         data = {
@@ -149,10 +157,9 @@ class ChatClient:
                 message = self.socket.recv(1024).decode()
                 if not message:
                     break
-                
+
                 data = json.loads(message)
-                
-                
+
                 message_type = data.get('type')
                 message_handlers = {
                     'public_key': self.handle_public_key,
@@ -160,9 +167,9 @@ class ChatClient:
                     'server': self.handle_message_server,
                     'token': self.handle_token
                 }
-                
+
                 handler = message_handlers.get(message_type)
-                
+
                 if handler:
                     handler(data)
                 else:
@@ -172,7 +179,7 @@ class ChatClient:
                 logging.error(
                     'Error occurred while receiving messages: %s', error)
                 break
-                
+
     def handle_token(self, data):
         encrypted_token_b64 = data.get('token')
         encrypted_token = base64.b64decode(encrypted_token_b64)
@@ -184,69 +191,71 @@ class ChatClient:
                 label=None
             ))
         self.token = decrypted_token
-        logging.info(f'Token received from server: {decrypted_token}')
-                
+        logging.info('Token received from server: %s', decrypted_token)
+
     def handle_message_server(self, data):
         message = data.get('message')
         status_code = data.get('status_code')
-    
+
         if status_code is None:
             logging.info('SERVER: %s', message)
             return
-    
-        if status_code == 1001 or status_code == 1002:
-            # Login response
-            if self.web_interface:
-                self.web_interface.handle_login_response(status_code)
-            if status_code == 1002:
-                logging.info(f'SERVER {status_code}: Logged in successfully.')
-        elif status_code == 1009:
-            # User logged out
+
+        if self.web_interface:
+            self.web_interface.handle_status_response(data, status_code)
+
+        if status_code in (StatusCode.INVALID_LOGIN, StatusCode.LOGIN_SUCCESSFUL):
+            if status_code == StatusCode.LOGIN_SUCCESSFUL:
+                logging.info('SERVER %s: Logged in successfully.', status_code)
+        elif status_code == StatusCode.USER_LOGGED_OUT:
             username = message
             if self.message_keys.get(username):
                 del self.message_keys[username]
-            logging.info(f"SERVER {status_code}: User '{username}' logged out. Message Keys for {username} deleted.")
-        elif status_code == 1010:
-            # User logged in
+            logging.info("SERVER %s: User '%s' logged out. Message Keys for %s deleted.",
+                         status_code, username, username)
+        elif status_code == StatusCode.USER_LOGGED_IN:
             username = message
-            logging.info(f"SERVER {status_code}: User '{username}' logged in.")
+            logging.info("SERVER %s: User '%s' logged in.",
+                         status_code, username)
         else:
-            logging.info(f'SERVER: Status Code {status_code}')
-        
-                
+            logging.info('SERVER: Status Code %s', status_code)
+
     def handle_message_user(self, data):
         sender = data.get('sender')
         message_b64 = data.get('message')
-        
+
         encrypted_message_with_iv = base64.b64decode(message_b64)
         iv = encrypted_message_with_iv[:16]
         encrypted_message = encrypted_message_with_iv[16:]
 
         message_key = self.generate_message_key(sender)
-        
-        cipher = Cipher(algorithms.AES(message_key), modes.CBC(iv), backend=default_backend())
+
+        cipher = Cipher(algorithms.AES(message_key),
+                        modes.CBC(iv), backend=default_backend())
         decryptor = cipher.decryptor()
-        decrypted_message = decryptor.update(encrypted_message) + decryptor.finalize()
+        decrypted_message = decryptor.update(
+            encrypted_message) + decryptor.finalize()
 
         unpadder = PKCS7(128).unpadder()
-        unpadded_data = unpadder.update(decrypted_message) + unpadder.finalize()
+        unpadded_data = unpadder.update(
+            decrypted_message) + unpadder.finalize()
         message = unpadded_data.decode('utf-8')
-        
+
         if self.web_interface:
-            d = data.copy()
-            d['message'] = message
-            self.web_interface.update_chat_interface(d)
-        
+            data_copy = data.copy()
+            data_copy['message'] = message
+            self.web_interface.update_chat_interface(data_copy)
+
         logging.info('%s: %s', sender, message)
-        
-                
+
     def handle_public_key(self, data):
         public_key_b64 = data['public_key']
         public_key_bytes = base64.b64decode(public_key_b64)
         public_key = x25519.X25519PublicKey.from_public_bytes(public_key_bytes)
         owner = data.get('owner')
         self.shared_public_keys[owner] = public_key
-        logging.info('The public key provided by user %s has been successfully received and stored.', owner)
+        logging.info(
+            'The public key provided by user %s has been successfully received and stored.', owner)
 
     def send_messages(self):
         while self.is_running:
@@ -272,7 +281,7 @@ class ChatClient:
             while self.is_running:
                 input_str = input()
                 command, *args = input_str.split()
-                
+
                 if command.lower() == "/msg" and len(args) >= 2:
                     recipient = args[0]
                     message = " ".join(args[1:])
@@ -311,5 +320,5 @@ class ChatClient:
 
 
 if __name__ == '__main__':
-    client = ChatClient('localhost', 12100, CERT_FILE)
+    client = ChatClient(SERVER_HOST, SERVER_PORT, CERT_FILE)
     client.run()
