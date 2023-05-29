@@ -164,14 +164,10 @@ class ChatClient:
                 handler = message_handlers.get(message_type)
                 
                 if handler:
-                    if self.web_interface:
-                        self.web_interface.update_chat_interface(data)
                     handler(data)
                 else:
                     logging.info('Received message: %s', data)
-                    
-        
-                    
+
             except socket.error as error:
                 logging.error(
                     'Error occurred while receiving messages: %s', error)

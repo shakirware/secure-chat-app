@@ -1,8 +1,18 @@
 import cherrypy
 import threading
 import json
+import os
 from jinja2 import Environment, FileSystemLoader
 from client import ChatClient
+
+# Set the directory where your CSS file is located
+static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'static'))
+
+# Configure CherryPy to serve static files from the specified directory
+cherrypy.config.update({
+    'tools.staticdir.on': True,
+    'tools.staticdir.dir': static_dir,
+})
 
 access_log = cherrypy.log.access_log
 for handler in tuple(access_log.handlers):
@@ -52,7 +62,11 @@ class ChatWebInterface:
     
         if recipient and message:
             self.chat_client.send_message(recipient, message)
-            self.messages.append(f'You: {message}')
+            data = {
+                'sender': 'You',
+                'message': message
+            }
+            self.messages.append(data)
     
     
     @cherrypy.expose
@@ -63,9 +77,6 @@ class ChatWebInterface:
     def update_chat_interface(self, message):
         # Add the message to the array or storage of messages
         self.messages.append(message)
-
-        #if len(self.messages) > MAX_MESSAGES:
-        #    self.messages = self.messages[-MAX_MESSAGES:]
 
     def handle_login_response(self, status_code):
         if status_code == 1002:

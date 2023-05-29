@@ -1,0 +1,72 @@
+:root{
+  --main-bg: #2c2f33;
+  --chat-bg: #99aab5;
+  --border-bg: #23272a;
+  --message-bg: #7289da;
+}
+
+body {
+  padding-top: 10%; /* Adjust the value as needed */
+}
+
+.main-bg {
+  background: var(--main-bg) !important;
+}
+
+header {
+	background: var(--border-bg);
+	
+}
+
+h2 {
+	color: #fff;
+}
+
+.chat-box {
+	height: 400px;
+	overflow-y: scroll;
+	background-color: var(--chat-bg);
+	border: 1px solid var(--border-bg);
+	border-radius: 5px;
+	padding: 10px;
+}
+
+.message {
+	margin-bottom: 10px;
+	padding: 10px;
+	background-color: var(--message-bg);
+	border: 1px solid var(--border-bg);
+	border-radius: 5px;
+}
+
+.message .sender p {
+	margin-bottom: 5px;
+	font-weight: bold;
+}
+
+.message .content p {
+	margin-bottom: 0;
+}
+
+.message-input {
+    display: flex;
+    align-items: center;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    padding: 10px;
+    background-color: var(--border-bg);
+    box-shadow: 0px -1px 10px rgba(0, 0, 0, 0.1);
+}
+
+.input-group-prepend,
+.input-group-append {
+    flex: 0 0 auto;
+	margin-right: 10px;
+}
+
+.input-group-append button {
+	margin-left: 10px;
+    white-space: nowrap;
+}
