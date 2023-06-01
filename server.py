@@ -1,5 +1,5 @@
-# config to store constants
-# tell each user who is online when you log in
+# when user logs in give a list of current online users.
+# double ratchet
 import logging
 import socket
 import ssl
@@ -179,7 +179,7 @@ class ChatServer(threading.Thread):
         self.send_status_response(
             StatusCode.LOGIN_SUCCESSFUL, client_socket_ssl)
 
-        token = Fernet.generate_key()
+        token = Fernet.generate_key() # random 32-byte base64-encoded value
         self.authenticated_clients[username] = {
             'socket': client_socket_ssl,
             'rsa_public_key': rsa_public_key,
@@ -215,7 +215,7 @@ class ChatServer(threading.Thread):
 
         if self.database.register_user(username, password):
             self.send_status_response(
-                StatusCode.REGISTRATION_SUCCESSFUL, client_socket_ssl)
+                StatusCode.REGISTRATION_SUCCESSFUL, client_socket_ssl, username)
             logging.info('User Registered: %s', username)
         else:
             self.send_status_response(

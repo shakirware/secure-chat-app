@@ -1,5 +1,16 @@
-# maybe a class store keys
-# group chat functionality ?
+# maybe a class to store keys
+# group chat functionality - generate secret key with every user.
+# add user friendly logging for every status code
+# write fake client
+# undelivered messages - store last message key before going offline
+# message storage
+
+# fix - create status code for ALREADY_LOGGED_IN
+
+
+# why certain things arent used anymore
+# distributed client
+# MTProto
 import base64
 import json
 import logging
@@ -21,7 +32,7 @@ from cryptography.hazmat.primitives.padding import PKCS7
 
 from modules.rsa_key_generator import generate_rsa_key_pair
 from modules.status_codes import StatusCode
-from modules.x25519_key_exchange import generate_key_pair, derive_encryption_key
+from modules.x25519_key_generator import generate_key_pair, derive_encryption_key
 from config.server_config import *
 
 logging.basicConfig(level=logging.INFO,
@@ -33,7 +44,8 @@ class ChatClient:
         self.port = port
         self.cert_file = cert_file
         self.x25519_private_key, self.x25519_public_key = generate_key_pair()
-        self.rsa_private_key, self.rsa_public_key = generate_rsa_key_pair()
+        self.rsa_private_key = None
+        self.rsa_public_key = None
         self.shared_public_keys = {}
         self.message_keys = {}
         self.message_queue = Queue()
@@ -121,6 +133,56 @@ class ChatClient:
         json_message = json.dumps(data)
         self.message_queue.put(json_message)
 
+    def generate_and_save_rsa_key_pair(self, username):
+        rsa_private_key, rsa_public_key = generate_rsa_key_pair()
+        
+        user_folder = f"./storage/{username}"
+        if not os.path.exists(user_folder):
+            os.makedirs(user_folder)
+        
+        
+        private_key_file = os.path.join(user_folder, "rsa_private_key.pem")
+        public_key_file = os.path.join(user_folder, "rsa_public_key.pem")
+
+        # Save the private key to a file
+        with open(private_key_file, "wb") as f:
+            private_key_bytes = rsa_private_key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.PKCS8,
+                encryption_algorithm=serialization.NoEncryption()
+            )
+            f.write(private_key_bytes)
+
+        # Save the public key to a file
+        with open(public_key_file, "wb") as f:
+            public_key_bytes = rsa_public_key.public_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PublicFormat.SubjectPublicKeyInfo
+            )
+            f.write(public_key_bytes) 
+
+    def load_rsa_key_pair(self, username):
+        user_folder = f".\\storage\\{username}"
+        private_key_file = os.path.join(user_folder, "rsa_private_key.pem")
+        public_key_file = os.path.join(user_folder, "rsa_public_key.pem")
+
+        # Load the private key from file
+        with open(private_key_file, "rb") as f:
+            private_key_bytes = f.read()
+            self.rsa_private_key = serialization.load_pem_private_key(
+                private_key_bytes,
+                password=None,
+                backend=default_backend()
+            )
+
+        # Load the public key from file
+        with open(public_key_file, "rb") as f:
+            public_key_bytes = f.read()
+            self.rsa_public_key = serialization.load_pem_public_key(
+                public_key_bytes,
+                backend=default_backend()
+            )
+
     def send_rsa_public_key(self):
         public_key_bytes = self.rsa_public_key.public_bytes(
             encoding=serialization.Encoding.PEM,
@@ -133,6 +195,18 @@ class ChatClient:
         }
         json_message = json.dumps(data)
         self.message_queue.put(json_message)
+        
+    def login(self, username, password):
+        client_folder = f"./storage/{username}"
+        if os.path.exists(client_folder):
+            self.load_rsa_key_pair(username)
+            logging.info("Loaded existing RSA key pair.")
+        else:
+            logging.info("Storage folder for account not found.")
+            return
+        
+        self.send_rsa_public_key()
+        self.send_login_request(username, password)
 
     def send_login_request(self, username, password):
         data = {
@@ -218,6 +292,10 @@ class ChatClient:
             username = message
             logging.info("SERVER %s: User '%s' logged in.",
                          status_code, username)
+        elif status_code == StatusCode.REGISTRATION_SUCCESSFUL:
+            username = message
+            self.generate_and_save_rsa_key_pair(username)
+            logging.info("Generated and saved new RSA key pair.")
         else:
             logging.info('SERVER: Status Code %s', status_code)
 
@@ -275,7 +353,7 @@ class ChatClient:
         commands = {
             "/quit": self.quit,
             "/msg": self.send_message,
-            "/login": self.send_login_request,
+            "/login": self.login,
             "/register": self.send_register_request
         }
         try:
@@ -298,13 +376,13 @@ class ChatClient:
     def quit(self):
         self.is_running = False
         self.socket.close()
+                
 
     def run(self):
         self.connect()
         logging.info("Connected to server")
 
         self.send_x25519_public_key()
-        self.send_rsa_public_key()
 
         receive_thread = threading.Thread(target=self.receive_messages)
         receive_thread.start()

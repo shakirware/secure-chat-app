@@ -3,7 +3,6 @@ import hashlib
 import random
 import string
 
-
 class ChatDatabase:
     def __init__(self, db_file):
         self.db_file = db_file
