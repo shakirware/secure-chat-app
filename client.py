@@ -1,16 +1,18 @@
-# maybe a class to store keys
-# group chat functionality - generate secret key with every user.
-# add user friendly logging for every status code
-# write fake client
-# undelivered messages - store last message key before going offline
-# message storage
-
 # fix - create status code for ALREADY_LOGGED_IN
+# add user friendly logging for every status code
 
+# token needs to be sent with every authenticated message.
 
-# why certain things arent used anymore
-# distributed client
-# MTProto
+# message storage - store messages securely in ./storage/user
+# undelivered messages - store last message key before going offline
+
+# group chat functionality - generate secret key with every user.
+
+# rsa public key only gets sent on sign up and the server stores it.
+
+# write fake client
+# maybe a class to store keys
+
 import base64
 import json
 import logging
@@ -20,6 +22,7 @@ import ssl
 import sys
 import threading
 import time
+import sqlite3
 
 from queue import Queue, Empty
 from cryptography.hazmat.backends import default_backend
@@ -98,6 +101,12 @@ class ChatClient:
             'token': token_b64,
             'timestamp': int(time.time())
         }
+        
+        data_copy = data.copy()
+        data_copy['message'] = message
+        
+        self.store_logs(data_copy, message_key)
+        
         json_message = json.dumps(data)
         self.message_queue.put(json_message)
         logging.info('You: %s', message)
@@ -281,6 +290,7 @@ class ChatClient:
 
         if status_code in (StatusCode.INVALID_LOGIN, StatusCode.LOGIN_SUCCESSFUL):
             if status_code == StatusCode.LOGIN_SUCCESSFUL:
+                self.username = message
                 logging.info('SERVER %s: Logged in successfully.', status_code)
         elif status_code == StatusCode.USER_LOGGED_OUT:
             username = message
@@ -320,12 +330,58 @@ class ChatClient:
             decrypted_message) + unpadder.finalize()
         message = unpadded_data.decode('utf-8')
 
-        if self.web_interface:
-            data_copy = data.copy()
-            data_copy['message'] = message
-            self.web_interface.update_chat_interface(data_copy)
+        # store in database
+        # store_logs(self, data, message_key)
+        
+        data_copy = data.copy()
+        data_copy['message'] = message
 
+        self.store_logs(data_copy, message_key)
+        
+        if self.web_interface:
+            self.web_interface.update_chat_interface(data_copy)
+            
         logging.info('%s: %s', sender, message)
+
+    def store_logs(self, data, message_key):
+
+        # create a function for storing chat messages
+        self.store_chat_message(data)
+         
+        # create function for storing message keys
+        self.store_latest_message_key(data, message_key)
+                   
+        
+    def store_chat_message(self, data):
+        #{'type': 'message', 'sender': 'alice', 'recipient': 'shakir', 'message': 'aa', 'timestamp': 1685580319}
+        message = data.get('message')
+        sender = data.get('sender')
+        recipient = data.get('recipient')
+        timestamp = data.get('timestamp')
+    
+        conn = sqlite3.connect(f'./storage/{self.username}/chat.db')
+        cursor = conn.cursor()
+        cursor.execute("CREATE TABLE IF NOT EXISTS chat_messages (message TEXT, sender TEXT, recipient TEXT, timestamp INT)")
+        cursor.execute("INSERT INTO chat_messages (message, sender, recipient, timestamp) VALUES (?, ?, ?, ?)",
+                   (message, sender, recipient, timestamp))
+        conn.commit()           
+        conn.close()    
+        
+        
+    def store_latest_message_key(self, data, message_key):
+        sender = data.get('sender')
+        recipient = data.get('recipient')
+        
+        chat_partner = recipient if sender == self.username else sender
+
+        conn = sqlite3.connect(f'./storage/{self.username}/chat.db')
+        cursor = conn.cursor()
+        cursor.execute("CREATE TABLE IF NOT EXISTS latest_message_keys (username TEXT UNIQUE, message_key TEXT)")
+        cursor.execute("INSERT OR REPLACE INTO latest_message_keys (username, message_key) VALUES (?, ?)",
+                   (chat_partner, message_key))
+        conn.commit()           
+        conn.close()           
+        
 
     def handle_public_key(self, data):
         public_key_b64 = data['public_key']

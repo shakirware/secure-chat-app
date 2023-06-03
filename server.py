@@ -177,7 +177,7 @@ class ChatServer(threading.Thread):
 
         del self.unauthenticated_clients[client_socket_ssl]
         self.send_status_response(
-            StatusCode.LOGIN_SUCCESSFUL, client_socket_ssl)
+            StatusCode.LOGIN_SUCCESSFUL, client_socket_ssl, username)
 
         token = Fernet.generate_key() # random 32-byte base64-encoded value
         self.authenticated_clients[username] = {
