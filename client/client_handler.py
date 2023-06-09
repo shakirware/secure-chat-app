@@ -42,6 +42,7 @@ from client.user import User
 
 from client.utils import generate_and_send_rsa_public_key, load_rsa_private_key
 
+from client.chat_database import ChatDatabase
 
 class ClientHandler:
     """
@@ -79,6 +80,7 @@ class ClientHandler:
         self.x25519_private_key = None
         self.token = None
         self.username = None
+        self.chat_database = None
         self.users = []
 
     def handle_message_user(self, packet):
@@ -93,7 +95,10 @@ class ClientHandler:
         """
         key = self.get_user_key(packet.sender)
         message = decrypt_message_with_aes(packet.message, key)
-        # store message in database
+        
+        self.chat_database.insert_message(packet.sender, packet.recipient, message, packet.timestamp)
+        self.chat_database.insert_key(packet.sender, key)
+        
         logging.info('%s: %s', packet.sender, message)
 
     def handle_login(self, username, password):
@@ -148,6 +153,7 @@ class ClientHandler:
         elif packet.status_code == LOGIN_SUCCESSFUL:
             logging.info("Login was successful.")
             self.username = packet.username
+            self.chat_database = ChatDatabase(self.username)
         elif packet.status_code == USER_LOGGED_OUT:
             for user in self.users:
                 if user.username == packet.username:
@@ -216,7 +222,10 @@ class ClientHandler:
             timestamp=int(time.time()),
         )
         self.client.message_queue.put(packet)
-        # also need to store message
+        
+        self.chat_database.insert_message(packet.sender, packet.recipient, message, packet.timestamp)
+        self.chat_database.insert_key(packet.recipient, key)
+
         logging.info('%s: %s', self.username, message)
 
     def get_user_key(self, msg_username):
