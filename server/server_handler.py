@@ -45,6 +45,7 @@ class ServerHandler:
         notify_clients_user_logged_out(username): Notifies all clients that a user has logged out.
         notify_clients_user_logged_in(username): Notifies all clients that a user has logged in.
         notify_x25519_public_key(): Notifies all clients with the X25519 public key of connected clients.
+        store_pending_message(recipient_username, message_packet): Stores a message packet in the pending messages dictionary for a recipient.
     """
 
     def __init__(self, server):
@@ -55,6 +56,7 @@ class ServerHandler:
             server (Server): An instance of the Server class representing the server.
         """
         self.server = server
+        self.pending_messages = {}
 
     def handle_register(self, packet, client):
         """
@@ -115,12 +117,13 @@ class ServerHandler:
         if token == client.token:
             recipient = next(
                 (c for c in self.server.clients if c.username == packet.recipient), None)
-            if recipient is not None:
+            if recipient is None:
+                # Recipient not found/not online so store message to be sent if recipient comes online
+                self.store_pending_message(packet.recipient, packet)
+                return
+            else:
                 json_data = packet.to_json()
                 recipient.socket.send(json_data.encode('utf-8'))
-            else:
-                # Recipient not found/not online
-                return
         else:
             logging.info("Invalid token received from user '%s'.",
                          client.username)
@@ -163,7 +166,12 @@ class ServerHandler:
                          username, client.token)
 
             self.server.clients.append(client)
-
+            
+            pending_messages = self.pending_messages.pop(username, None)
+            if pending_messages is not None:
+                for undelivered_packet in pending_messages:
+                    requests.send_undelivered_message(client.socket, undelivered_packet)
+            
             self.notify_clients_user_logged_in(username)
             self.notify_x25519_public_key()
 
@@ -201,3 +209,17 @@ class ServerHandler:
                 requests.send_x25519_public_key(
                     target_client.socket, public_key_b64, client.username)
         logging.info("Broadcasted X25519 Public Keys to all clients.")
+
+    def store_pending_message(self, recipient_username, message_packet):
+        """
+        Stores a message packet in the pending messages dictionary for a recipient.
+
+        Args:
+            recipient_username (str): The username of the recipient.
+            message_packet (Packet): The message packet to be stored.
+        """
+        if recipient_username not in self.pending_messages:
+            self.pending_messages[recipient_username] = []
+            
+        self.pending_messages[recipient_username].append(message_packet)
+        logging.info("Message stored for offline user '%s'.", recipient_username)

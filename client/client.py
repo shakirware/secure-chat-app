@@ -105,6 +105,8 @@ class Client(threading.Thread):
                     self.handler.handle_message_server(packet)
                 elif packet.packet_type == 'public_key':
                     self.handler.handle_public_key(packet)
+                elif packet.packet_type == 'offline':
+                    self.handler.handle_offline_messages(packet)
                 else:
                     logging.info('Invalid packet type.')
 

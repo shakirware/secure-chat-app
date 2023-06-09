@@ -19,6 +19,7 @@ Functions:
     - send_user_already_logged_in(socket): Sends a user already logged in response to the client.
     - send_x25519_public_key(socket, public_key, owner): Sends an X25519 public key to the client.
     - send_token(socket, token): Sends a session token to the client.
+    - send_undelivered_message(socket, packet): Sends an undelivered message response to the client.
 """
 
 import time
@@ -230,5 +231,24 @@ def send_token(socket, token):
         token=token,
         timestamp=int(time.time())
     )
+    json_data = packet.to_json()
+    socket.send(json_data.encode('utf-8'))
+
+
+def send_undelivered_message(socket, packet):
+    """
+    Sends an undelivered message response to the client.
+
+    This function is used to send a response to the client indicating that a message was not delivered.
+    It sets the packet type to 'offline', converts the packet to JSON format, and sends it to the client socket.
+
+    Args:
+        socket (socket): The client socket to send the response to.
+        packet (Packet): The packet containing the undelivered message.
+
+    Returns:
+        None
+    """
+    packet.packet_type = 'offline'
     json_data = packet.to_json()
     socket.send(json_data.encode('utf-8'))

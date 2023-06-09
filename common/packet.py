@@ -26,7 +26,6 @@ class Packet:
 
     Methods:
         packet_type (property): Get the type of the packet.
-        username (property): Get the username from the packet data.
         from_json(cls, json_data): Create a Packet object from JSON data.
         __getattr__(self, attr): Get the value of an attribute from the packet data.
         to_json(self): Convert the Packet object to JSON format.
@@ -46,15 +45,16 @@ class Packet:
         """
         return self._packet_type
 
-    @property
-    def username(self):
+    @packet_type.setter
+    def packet_type(self, value):
         """
-        Get the username from the packet data.
+        Set the type of the packet.
 
-        Returns:
-            str: The username.
+        Args:
+            value (str): The type of the packet.
         """
-        return self.data.get('username')
+        self._packet_type = value
+
 
     @classmethod
     def from_json(cls, json_data):

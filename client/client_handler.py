@@ -12,6 +12,7 @@ Module dependencies:
     - common.status_codes: A custom module that defines status codes for network communication.
     - client.user: A custom module that defines the User class for representing users.
     - client.utils: A custom module that provides utility functions for the client.
+    - client.chat_database: A custom module that provides functionality for the chat database.
 
 Classes:
     - ClientHandler: Represents a client handler for handling client-side operations.
@@ -54,6 +55,7 @@ class ClientHandler:
         x25519_private_key (x25519.X25519PrivateKey): The client's X25519 private key.
         token (bytes): The session token received from the server.
         username (str): The username of the client.
+        chat_database (ChatDatabase): The chat database instance.
         users (list): A list of connected user instances.
 
     Methods:
@@ -63,6 +65,7 @@ class ClientHandler:
         - handle_message_server(packet): Handles a message from the server.
         - handle_token(packet): Handles the session token received from the server.
         - handle_public_key(packet): Handles a public key received from another user.
+        - handle_offline_messages(packet): Handles offline messages received from the server.
         - send_encrypted_message(recipient_username, message): Sends an encrypted message to a recipient.
         - get_user_key(msg_username): Retrieves the encryption key for a user.
     """
@@ -197,6 +200,17 @@ class ClientHandler:
         self.users.append(user)
         logging.info(
             "Public Key from User '%s' has been stored.", packet.owner)
+            
+    def handle_offline_messages(self, packet):
+        last_key = self.chat_database.get_key(packet.sender)
+        key = calculate_message_key(last_key)
+        
+        message = decrypt_message_with_aes(packet.message, key)
+        
+        self.chat_database.insert_message(packet.sender, packet.recipient, message, packet.timestamp)
+        self.chat_database.insert_key(packet.sender, key)
+        
+        logging.info("Received offline message: %s: %s", packet.sender, message)
 
     def send_encrypted_message(self, recipient_username, message):
         """
@@ -210,6 +224,10 @@ class ClientHandler:
             None
         """
         key = self.get_user_key(recipient_username)
+        
+        if key is None:
+            return
+        
         encrypted_message_b64 = encrypt_message_with_aes(
             message, key)
         token_b64 = base64.b64encode(self.token).decode('utf-8')
@@ -240,14 +258,28 @@ class ClientHandler:
         """
         msg_user = next(
             (user for user in self.users if user.username == msg_username), None)
-        if not msg_user:
-            logging.info("User '%s' not found.", msg_username)
-            return None
-        if not msg_user.key:
-            shared_secret = calculate_x25519_shared_secret(
-                self.x25519_private_key, msg_user.x25519_public_key)
-            key = calculate_message_key(shared_secret)
+            
+        if msg_user:
+            #online
+            if not msg_user.key:
+                shared_secret = calculate_x25519_shared_secret(
+                    self.x25519_private_key, msg_user.x25519_public_key)
+                key = calculate_message_key(shared_secret)
+                logging.info("Generated key from Diffie-Hellman shared secret: %s", key.hex())
+            else:
+                key = calculate_message_key(msg_user.key)
+                logging.info("Generated key using HKDF: %s", key.hex())
+            msg_user.key = key
+        
         else:
-            key = calculate_message_key(msg_user.key)
-        msg_user.key = key
+            # offline or not exist
+            if msg_username in self.chat_database.get_usernames():
+                # user is just offline
+                # get latest key from database.
+                last_key = self.chat_database.get_key(msg_username)
+                key = calculate_message_key(last_key)
+            else:
+                logging.info("User '%s' not found.", msg_username)
+                return None    
+
         return key

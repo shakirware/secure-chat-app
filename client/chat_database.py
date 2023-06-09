@@ -21,7 +21,8 @@ class ChatDatabase:
             username (str): The username associated with the database.
 
         """
-        self.db_file = f"./storage/{username}/messages.db"
+        self.username = username
+        self.db_file = f"./storage/{self.username}/messages.db"
         self.create_tables()
 
     def create_tables(self):
@@ -89,3 +90,46 @@ class ChatDatabase:
             messages = cursor.fetchall()
 
             return messages
+
+    def get_usernames(self):
+        """
+        Retrieve a list of all usernames in chat_messages that are not equal to self.username.
+
+        Returns:
+            list: A list of usernames.
+
+        """
+        with sqlite3.connect(self.db_file) as conn:
+            cursor = conn.cursor()
+
+            cursor.execute('''SELECT DISTINCT sender FROM chat_messages WHERE sender != ?''', (self.username,))
+            senders = cursor.fetchall()
+
+            cursor.execute('''SELECT DISTINCT recipient FROM chat_messages WHERE recipient != ?''', (self.username,))
+            recipients = cursor.fetchall()
+
+            usernames = set([username[0] for username in senders + recipients])
+
+            return list(usernames)
+
+    def get_key(self, user):
+        """
+        Retrieve the latest encryption key for a specific user.
+
+        Args:
+            user (str): The username associated with the key.
+
+        Returns:
+            int: The latest encryption key for the user, or None if the user doesn't exist.
+
+        """
+        with sqlite3.connect(self.db_file) as conn:
+            cursor = conn.cursor()
+
+            cursor.execute('''SELECT key FROM latest_key WHERE user = ?''', (user,))
+            result = cursor.fetchone()
+
+            if result:
+                return result[0]
+            else:
+                return None
