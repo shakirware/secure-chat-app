@@ -55,7 +55,6 @@ class Packet:
         """
         self._packet_type = value
 
-
     @classmethod
     def from_json(cls, json_data):
         """

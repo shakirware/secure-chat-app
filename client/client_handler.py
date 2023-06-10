@@ -45,6 +45,7 @@ from client.utils import generate_and_send_rsa_public_key, load_rsa_private_key
 
 from client.chat_database import ChatDatabase
 
+
 class ClientHandler:
     """
     The ClientHandler class represents a client handler for handling client-side operations.
@@ -98,10 +99,11 @@ class ClientHandler:
         """
         key = self.get_user_key(packet.sender)
         message = decrypt_message_with_aes(packet.message, key)
-        
-        self.chat_database.insert_message(packet.sender, packet.recipient, message, packet.timestamp)
+
+        self.chat_database.insert_message(
+            packet.sender, packet.recipient, message, packet.timestamp)
         self.chat_database.insert_key(packet.sender, key)
-        
+
         logging.info('%s: %s', packet.sender, message)
 
     def handle_login(self, username, password):
@@ -200,17 +202,19 @@ class ClientHandler:
         self.users.append(user)
         logging.info(
             "Public Key from User '%s' has been stored.", packet.owner)
-            
+
     def handle_offline_messages(self, packet):
         last_key = self.chat_database.get_key(packet.sender)
         key = calculate_message_key(last_key)
-        
+
         message = decrypt_message_with_aes(packet.message, key)
-        
-        self.chat_database.insert_message(packet.sender, packet.recipient, message, packet.timestamp)
+
+        self.chat_database.insert_message(
+            packet.sender, packet.recipient, message, packet.timestamp)
         self.chat_database.insert_key(packet.sender, key)
-        
-        logging.info("Received offline message: %s: %s", packet.sender, message)
+
+        logging.info("Received offline message: %s: %s",
+                     packet.sender, message)
 
     def send_encrypted_message(self, recipient_username, message):
         """
@@ -224,10 +228,10 @@ class ClientHandler:
             None
         """
         key = self.get_user_key(recipient_username)
-        
+
         if key is None:
             return
-        
+
         encrypted_message_b64 = encrypt_message_with_aes(
             message, key)
         token_b64 = base64.b64encode(self.token).decode('utf-8')
@@ -240,8 +244,9 @@ class ClientHandler:
             timestamp=int(time.time()),
         )
         self.client.message_queue.put(packet)
-        
-        self.chat_database.insert_message(packet.sender, packet.recipient, message, packet.timestamp)
+
+        self.chat_database.insert_message(
+            packet.sender, packet.recipient, message, packet.timestamp)
         self.chat_database.insert_key(packet.recipient, key)
 
         logging.info('%s: %s', self.username, message)
@@ -258,19 +263,20 @@ class ClientHandler:
         """
         msg_user = next(
             (user for user in self.users if user.username == msg_username), None)
-            
+
         if msg_user:
-            #online
+            # online
             if not msg_user.key:
                 shared_secret = calculate_x25519_shared_secret(
                     self.x25519_private_key, msg_user.x25519_public_key)
                 key = calculate_message_key(shared_secret)
-                logging.info("Generated key from Diffie-Hellman shared secret: %s", key.hex())
+                logging.info(
+                    "Generated key from Diffie-Hellman shared secret: %s", key.hex())
             else:
                 key = calculate_message_key(msg_user.key)
                 logging.info("Generated key using HKDF: %s", key.hex())
             msg_user.key = key
-        
+
         else:
             # offline or not exist
             if msg_username in self.chat_database.get_usernames():
@@ -280,6 +286,6 @@ class ClientHandler:
                 key = calculate_message_key(last_key)
             else:
                 logging.info("User '%s' not found.", msg_username)
-                return None    
+                return None
 
         return key

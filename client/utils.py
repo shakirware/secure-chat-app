@@ -94,7 +94,8 @@ def generate_and_send_rsa_public_key(username, message_queue):
     """
     rsa_public_key = generate_rsa_key(username)
     rsa_public_key_b64 = base64.b64encode(rsa_public_key)
-    packet = Packet('public_key_rsa', username=username, public_key=rsa_public_key_b64)
+    packet = Packet('public_key_rsa', username=username,
+                    public_key=rsa_public_key_b64)
     message_queue.put(packet)
 
 
@@ -109,7 +110,8 @@ def load_rsa_private_key(private_key_path):
         cryptography.hazmat.primitives.asymmetric.rsa.RSAPrivateKey: The loaded RSA private key.
     """
     with open(private_key_path, "rb") as private_key_file:
-        private_key = serialization.load_pem_private_key(private_key_file.read(), password=None)
+        private_key = serialization.load_pem_private_key(
+            private_key_file.read(), password=None)
     return private_key
 
 

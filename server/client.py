@@ -16,6 +16,7 @@ Methods:
     - __init__(self, client_socket_ssl): Initializes a new instance of the Client class.
 """
 
+
 class Client:
     """
     Represents a connected client.

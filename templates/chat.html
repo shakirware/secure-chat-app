@@ -1,0 +1,67 @@
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SecureChat - Web Interface</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/css/bootstrap.min.css" />
+	<link rel="stylesheet" type="text/css" href="./chatstyle.css">
+	<script src="script.js"></script>
+</head>
+<body class="main-bg">
+
+	<header class="fixed-top">
+		<div class="container">
+			<div class="row justify-content-center">
+				<div class="col-lg-6 col-md-8">
+					<h2 class="text-center">Secure Chat</h2>
+				</div>
+			</div>
+		</div>
+	</header>
+	
+	<main class="mt-5">
+        <div class="container">
+            <div class="row justify-content-center">
+                <div class="col-lg-8 col-md-10">
+                    <div class="chat-box">
+                        <div class="messages">
+						
+                            <div class="message">
+                                <div class="sender">
+                                    <p>John Doe:</p>
+                                </div>
+                                <div class="content">
+                                    <p>Hello, how are you?</p>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+					
+                    <div class="message-input">
+                    <form>
+                        <div class="input-group">
+                            <div class="input-group-prepend">
+                                <input type="text" class="form-control" placeholder="Recipient's username" id="recipient">
+                            </div>
+                            <input type="text" class="form-control" placeholder="Enter your message" id="message">
+                            <div class="input-group-append">
+                                <button class="btn btn-primary" type="submit" onclick="sendMessage(event)">Send</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+					
+					
+					
+                </div>
+            </div>
+        </div>
+    </main>
+
+
+	
+
+
+</body>
+</html>

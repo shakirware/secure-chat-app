@@ -166,14 +166,17 @@ class ServerHandler:
                          username, client.token)
 
             self.server.clients.append(client)
-            
+
             pending_messages = self.pending_messages.pop(username, None)
             if pending_messages is not None:
                 for undelivered_packet in pending_messages:
-                    requests.send_undelivered_message(client.socket, undelivered_packet)
-            
+                    requests.send_undelivered_message(
+                        client.socket, undelivered_packet)
+
             self.notify_clients_user_logged_in(username)
             self.notify_x25519_public_key()
+        else:
+            requests.send_login_fail_response(client.socket, packet)
 
     def notify_clients_user_logged_out(self, username):
         """
@@ -220,6 +223,7 @@ class ServerHandler:
         """
         if recipient_username not in self.pending_messages:
             self.pending_messages[recipient_username] = []
-            
+
         self.pending_messages[recipient_username].append(message_packet)
-        logging.info("Message stored for offline user '%s'.", recipient_username)
+        logging.info("Message stored for offline user '%s'.",
+                     recipient_username)

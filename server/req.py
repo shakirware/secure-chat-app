@@ -27,6 +27,17 @@ from common.status_codes import *
 from common.packet import Packet
 
 
+def send_login_fail_response(socket, received_packet):
+    packet = Packet(
+        'server',
+        username=received_packet.username,
+        status_code=INVALID_LOGIN,
+        timestamp=int(time.time())
+    )
+    json_data = packet.to_json()
+    socket.send(json_data.encode('utf-8'))
+    
+
 def send_login_success_response(socket, received_packet):
     """
     Sends a login success response to the client.

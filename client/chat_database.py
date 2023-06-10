@@ -10,6 +10,7 @@ Dependencies:
 
 import sqlite3
 
+
 class ChatDatabase:
     """A class for managing chat messages in an SQLite database."""
 
@@ -102,10 +103,12 @@ class ChatDatabase:
         with sqlite3.connect(self.db_file) as conn:
             cursor = conn.cursor()
 
-            cursor.execute('''SELECT DISTINCT sender FROM chat_messages WHERE sender != ?''', (self.username,))
+            cursor.execute(
+                '''SELECT DISTINCT sender FROM chat_messages WHERE sender != ?''', (self.username,))
             senders = cursor.fetchall()
 
-            cursor.execute('''SELECT DISTINCT recipient FROM chat_messages WHERE recipient != ?''', (self.username,))
+            cursor.execute(
+                '''SELECT DISTINCT recipient FROM chat_messages WHERE recipient != ?''', (self.username,))
             recipients = cursor.fetchall()
 
             usernames = set([username[0] for username in senders + recipients])
@@ -126,7 +129,8 @@ class ChatDatabase:
         with sqlite3.connect(self.db_file) as conn:
             cursor = conn.cursor()
 
-            cursor.execute('''SELECT key FROM latest_key WHERE user = ?''', (user,))
+            cursor.execute(
+                '''SELECT key FROM latest_key WHERE user = ?''', (user,))
             result = cursor.fetchone()
 
             if result:

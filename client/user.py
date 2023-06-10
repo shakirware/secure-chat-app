@@ -5,6 +5,7 @@ Classes:
     User: Represents a user with their associated username and public key.
 """
 
+
 class User:
     """
     Represents a user with their associated username and public key.
