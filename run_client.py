@@ -1,13 +1,12 @@
 import logging
 import sys
-
-from client.client import Client
+import client
 from common.constants import *
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s [%(levelname)s] %(message)s')
 
-client = Client(SERVER_HOST, SERVER_PORT, CERT_FILE)
+client = client.Client(SERVER_HOST, SERVER_PORT, CERT_FILE)
 
 try:
     client.start()

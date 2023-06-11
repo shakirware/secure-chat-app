@@ -1,7 +1,7 @@
 import os
 import cherrypy
+import client
 
-from client.web_client_cherry import WebClient
 from common.constants import *
 
 cherrypy.log.access_log.handlers = []
@@ -16,6 +16,6 @@ cherrypy.config.update({
     'tools.staticdir.dir': static_dir,
 })
 
-web_client = WebClient(SERVER_HOST, SERVER_PORT, CERT_FILE)
+web_client = client.WebClient(SERVER_HOST, SERVER_PORT, CERT_FILE)
 web_client.start()
 cherrypy.quickstart(web_client)

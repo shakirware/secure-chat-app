@@ -95,9 +95,8 @@ class Server(threading.Thread):
             except json.decoder.JSONDecodeError:
                 break
 
-        self.clients.remove(client)
-
         if client.authenticated:
+            self.clients.remove(client)
             self.server_handler.notify_clients_user_logged_out(client.username)
 
         logging.info("Client disconnected. Peer address: %s.",

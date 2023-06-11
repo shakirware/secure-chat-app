@@ -1,13 +1,12 @@
 import logging
 import sys
-
-from server.server import Server
+import server
 from common.constants import *
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s [%(levelname)s] %(message)s')
 
-server = Server(SERVER_HOST, SERVER_PORT, CERT_FILE, KEY_FILE)
+server = server.Server(SERVER_HOST, SERVER_PORT, CERT_FILE, KEY_FILE)
 
 try:
     server.start()
