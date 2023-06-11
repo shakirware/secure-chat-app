@@ -76,22 +76,6 @@ class ChatDatabase:
             cursor.execute('''INSERT OR REPLACE INTO latest_key (user, key)
                               VALUES (?, ?)''', (user, key))
 
-    def get_all_messages(self):
-        """
-        Retrieve all chat messages from the database.
-
-        Returns:
-            list: A list of tuples representing the chat messages.
-
-        """
-        with sqlite3.connect(self.db_file) as conn:
-            cursor = conn.cursor()
-
-            cursor.execute('''SELECT * FROM chat_messages''')
-            messages = cursor.fetchall()
-
-            return messages
-
     def get_usernames(self):
         """
         Retrieve a list of all usernames in chat_messages that are not equal to self.username.
@@ -137,3 +121,37 @@ class ChatDatabase:
                 return result[0]
             else:
                 return None
+
+    def get_all_messages(self):
+        """
+        Retrieve all messages from the database and store them in a dictionary.
+
+        Returns:
+            dict: A dictionary containing arrays of messages for each username.
+
+        """
+        messages = {}
+
+        with sqlite3.connect(self.db_file) as conn:
+            cursor = conn.cursor()
+
+            cursor.execute('''SELECT DISTINCT sender FROM chat_messages WHERE sender != ?''', (self.username,))
+            senders = cursor.fetchall()
+
+            cursor.execute('''SELECT DISTINCT recipient FROM chat_messages WHERE recipient != ?''', (self.username,))
+            recipients = cursor.fetchall()
+
+            usernames = set([username[0] for username in senders + recipients])
+
+            for username in usernames:
+                cursor.execute('''SELECT sender, recipient, message, timestamp
+                                  FROM chat_messages
+                                  WHERE (sender = ? AND recipient = ?)
+                                  OR (sender = ? AND recipient = ?)
+                                  ORDER BY timestamp''',
+                               (self.username, username, username, self.username))
+                chat = cursor.fetchall()
+                messages[username] = chat
+
+        return messages
+    

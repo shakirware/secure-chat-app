@@ -17,7 +17,7 @@ import logging
 import base64
 
 from common.encryption import (
-    rsa_public_key_to_pem, encrypt_session_token_with_rsa,
+    encrypt_session_token_with_rsa,
     generate_session_token, pem_to_rsa_public_key
 )
 
@@ -92,11 +92,10 @@ class ServerHandler:
             packet (Packet): An instance of the Packet class representing the received packet.
             client (Client): An instance of the Client class representing the connected client.
         """
-        rsa_public_pem = rsa_public_key_to_pem(
-            base64.b64decode(packet.public_key))
+        rsa_public_key = base64.b64decode(packet.public_key)
         username = packet.username
 
-        if store_rsa_public_key(username, rsa_public_pem):
+        if store_rsa_public_key(username, rsa_public_key):
             log_message = f"RSA Public Key stored in database for user: {username}"
             requests.send_rsa_public_key_stored(client.socket)
         else:

@@ -1,73 +1,105 @@
-// Function to fetch new messages from the server
-        function fetchMessages() {
-            fetch('/get_messages')
-                .then(response => response.json())
-                .then(messages => {
-                    // Process the retrieved messages and update the UI
-                    updateMessageList(messages);
-                });
-        }
+let currentTab = null;
 
-        // Function to update the message list in the UI
-        function updateMessageList(messages) {
-            const messageContainer = document.querySelector('.messages');
-            messageContainer.innerHTML = '';
-			
-            // Iterate through the messages and add them to the list
-            messages.forEach(message => {
-				console.log(message)
-				
-				const sender = message.sender;
-				const content = message.message;
-				const timestamp = message.timestamp;
-				const date = new Date(timestamp * 1000);
-				const readableTime = date.toLocaleString();
-			
-				// Create message elements
-				const messageDiv = document.createElement('div');
-				messageDiv.classList.add('message');
+function fetchMessages() {
+  fetch('/message')
+    .then(response => response.json())
+    .then(messages => {
+      updateTabList(messages);
+    });
+}
 
-				const senderDiv = document.createElement('div');
-				senderDiv.classList.add('sender');
-				senderDiv.innerHTML = `<p>${readableTime}</p><p>${sender}:</p>`;
+function updateTabList(chatData) {
+  const tabsContainer = document.getElementById("chatsTab");
+  tabsContainer.innerHTML = '';
 
-				const contentDiv = document.createElement('div');
-				contentDiv.classList.add('content');
-				contentDiv.innerHTML = `<p>${content}</p>`;
+  for (const user in chatData) {
+    const messages = chatData[user];
+    const lastMessage = messages[messages.length - 1];
+    const timestamp = lastMessage[3];
+    const msg = lastMessage[2];
+    const sender = lastMessage[0];
+    const readableDate = new Date(timestamp * 1000).toLocaleString();
 
-				// Append sender and content to message div
-				messageDiv.appendChild(senderDiv);
-				messageDiv.appendChild(contentDiv);
+    const chatItem = document.createElement("a");
+    chatItem.classList = "text-decoration-none py-2 px-3 mx-3 my-1 chatMessage";
+    chatItem.href = "#";
+    chatItem.onclick = function() {
+      updateMessageList(user, chatData);
+      currentTab = user;
+    };
 
-				// Append message div to the message container
-				messageContainer.appendChild(messageDiv);
-				
-				const chatBox = document.querySelector('.chat-box');
-				chatBox.scrollTop = chatBox.scrollHeight;
-            });
-        }
+    const contentWrapper = document.createElement("div");
+    contentWrapper.classList = "d-flex w-100 align-items-center justify-content-between";
 
-        // Fetch new messages every 1 second
-        setInterval(fetchMessages, 1000);
+    const title = document.createElement("strong");
+    title.classList = "mb-1";
+    title.innerHTML = user;
 
-        // Function to send a new message
-        function sendMessage(event) {
-            event.preventDefault();
+    const date = document.createElement("small");
+    date.innerHTML = readableDate;
 
-            const recipient = document.getElementById('recipient').value;
-            const message = document.getElementById('message').value;
+    contentWrapper.appendChild(title);
+    contentWrapper.appendChild(date);
 
-            // Send the message to the server using fetch
-            fetch('/send_message', {
-                method: 'POST',
-                body: JSON.stringify({ recipient: recipient, message: message }),
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            })
-            .then(response => {
-                // Clear the input fields after sending the message
-                document.getElementById('recipient').value = '';
-                document.getElementById('message').value = '';
-            });
-        }
+    const description = document.createElement("div");
+    description.classList = "col-10 mb-1 small";
+    description.innerHTML = msg;
+
+    chatItem.appendChild(contentWrapper);
+    chatItem.appendChild(description);
+
+    tabsContainer.appendChild(chatItem);
+  }
+
+  if (currentTab != null) {
+    updateMessageList(currentTab, chatData);
+  }
+}
+
+function updateMessageList(user, chatData) {
+  const messages = chatData[user];
+  const chatContainer = document.getElementById("chatMessages");
+  chatContainer.innerHTML = '';
+
+  for (let i = 0; i < messages.length; i++) {
+    const message = messages[i];
+    const timestamp = message[3];
+    const msg = message[2];
+    const sender = message[0];
+    const readableDate = new Date(timestamp * 1000).toLocaleString();
+
+    const test = document.createElement("div");
+    test.classList = "rounded rounded-lg shadow";
+    test.style.background = "#446";
+    test.style.margin = "10px 5px";
+
+    const contentWrapper = document.createElement("div");
+    contentWrapper.classList = "d-flex w-100 align-items-center justify-content-between";
+
+    const title = document.createElement("b");
+    title.innerHTML = sender;
+    title.style.paddingLeft = "10px";
+    title.style.color = "#ddd";
+
+    const date = document.createElement("b");
+    date.innerHTML = readableDate;
+    date.style.paddingRight = "10px";
+    date.style.marginLeft = "auto";
+    date.style.color = "#ddd";
+
+    const text = document.createElement("p");
+    text.innerHTML = msg;
+    text.style.margin = "8px 8px 15px 8px";
+    text.style.padding = "5px";
+    text.style.color = "#cdd";
+
+    contentWrapper.appendChild(title);
+    contentWrapper.appendChild(date);
+    test.appendChild(contentWrapper);
+    test.appendChild(text);
+    chatContainer.appendChild(test);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+  }
+}
+
+setInterval(fetchMessages, 1000);

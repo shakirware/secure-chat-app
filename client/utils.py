@@ -22,7 +22,7 @@ import base64
 
 from cryptography.hazmat.primitives import serialization
 
-from common.encryption import generate_rsa_keypair
+from common.encryption import generate_rsa_keypair, rsa_public_key_to_base64
 from common.packet import Packet
 
 
@@ -93,7 +93,7 @@ def generate_and_send_rsa_public_key(username, message_queue):
         message_queue (Queue): The message queue to put the generated packet in.
     """
     rsa_public_key = generate_rsa_key(username)
-    rsa_public_key_b64 = base64.b64encode(rsa_public_key)
+    rsa_public_key_b64 = rsa_public_key_to_base64(rsa_public_key)
     packet = Packet('public_key_rsa', username=username,
                     public_key=rsa_public_key_b64)
     message_queue.put(packet)

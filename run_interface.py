@@ -1,7 +1,7 @@
 import os
 import cherrypy
 
-from client.web_interface import WebClient
+from client.web_client import WebClient
 from common.constants import *
 
 cherrypy.log.access_log.handlers = []

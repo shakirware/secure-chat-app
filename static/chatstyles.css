@@ -1,0 +1,47 @@
+.chatMessage {
+  background: transparent;
+  border-radius: 5px;
+  color: #cdd;
+}
+
+.chatMessage:hover {
+  background: #335;
+  transition: .075s ease all;
+}
+
+.chats::after {
+  content: "";
+  position: absolute;
+  margin: auto;
+  width: 90%;
+  height: 5px;
+  background: #446;
+  border-radius: 5px;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+/* Background color of the scrollbar */
+*::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+/* Color of the scrollbar handle */
+*::-webkit-scrollbar-thumb {
+  background-color: #557;
+  border-radius: 4px;
+  border: 2px solid #2f3136;
+}
+
+/* Color of the scrollbar handle on hover */
+*::-webkit-scrollbar-thumb:hover {
+  border-color: #557;
+}
+
+/* Color of the scrollbar corners */
+*::-webkit-scrollbar-corner {
+  background-color: #2f3136;
+}

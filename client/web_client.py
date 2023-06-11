@@ -14,10 +14,8 @@ class WebClient(Client):
         self.handler = WebClientHandler(self)
         self.login_event = threading.Event()
         self.login_status = False
-        self.messages = {}
-        
-    # client.database function that gets old messages from database and places it into a dictionary {}    
-
+        self.messages = None
+  
     @cherrypy.expose
     def index(self, error_message=None):
         template = self.env.get_template('login.html')
@@ -29,10 +27,9 @@ class WebClient(Client):
             self.handler.handle_login(username, password)
             self.login_event.wait()
             self.login_event.clear()
-
+            self.messages = self.handler.chat_database.get_all_messages()
             if self.login_status:
                 raise cherrypy.HTTPRedirect("/chat")
-
         return self.index(error_message="Invalid username or password. Please try again.") if username and password else self.index()
 
     @cherrypy.expose
@@ -40,10 +37,10 @@ class WebClient(Client):
         template = self.env.get_template('chat.html')
         return template.render()
 
+    @cherrypy.expose
     @cherrypy.tools.json_out()
-    def messages(self):
-        # return dict of messages
-        return self.messages
+    def message(self):
+        return self.handler.chat_database.get_all_messages()
 
 
 class WebClientHandler(ClientHandler):
@@ -51,11 +48,9 @@ class WebClientHandler(ClientHandler):
         super().__init__(client)
 
     def handle_message_server(self, packet):
+        super().handle_message_server(packet) 
         self.client.login_status = True if packet.status_code == LOGIN_SUCCESSFUL else self.client.login_status
         self.client.login_event.set()
-        super().handle_message_server(packet)     
         
     def handle_message_user(self, packet):
         super().handle_message_user(packet)   
-
-        # get latest message from database
