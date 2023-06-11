@@ -7,15 +7,16 @@ from client.client import Client
 
 from common.status_codes import LOGIN_SUCCESSFUL
 
+
 class WebClient(Client):
     def __init__(self, host, port, certfile, interface=None):
         super().__init__(host, port, certfile, interface)
-        self.env = Environment(loader=FileSystemLoader('templates'))
+        self.env = Environment(loader=FileSystemLoader('./client/templates/'))
         self.handler = WebClientHandler(self)
         self.login_event = threading.Event()
         self.login_status = False
         self.messages = None
-  
+
     @cherrypy.expose
     def index(self, error_message=None):
         template = self.env.get_template('login.html')
@@ -48,9 +49,9 @@ class WebClientHandler(ClientHandler):
         super().__init__(client)
 
     def handle_message_server(self, packet):
-        super().handle_message_server(packet) 
+        super().handle_message_server(packet)
         self.client.login_status = True if packet.status_code == LOGIN_SUCCESSFUL else self.client.login_status
         self.client.login_event.set()
-        
+
     def handle_message_user(self, packet):
-        super().handle_message_user(packet)   
+        super().handle_message_user(packet)

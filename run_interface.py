@@ -1,14 +1,15 @@
 import os
 import cherrypy
 
-from client.web_client import WebClient
+from client.web_client_cherry import WebClient
 from common.constants import *
 
 cherrypy.log.access_log.handlers = []
 cherrypy.log.error_log.propagate = False
 cherrypy.log.access_log.propagate = False
 
-static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'static'))
+static_dir = os.path.abspath(os.path.join(
+    os.path.dirname(__file__), './client/static/'))
 
 cherrypy.config.update({
     'tools.staticdir.on': True,

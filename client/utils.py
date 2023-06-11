@@ -38,7 +38,7 @@ def generate_rsa_key(username):
     """
     rsa_private_key, rsa_public_key = generate_rsa_keypair()
 
-    user_folder = f"./storage/{username}"
+    user_folder = f"./client/storage/{username}"
     if not os.path.exists(user_folder):
         os.makedirs(user_folder)
 

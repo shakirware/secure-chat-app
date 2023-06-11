@@ -134,6 +134,8 @@ class Server(threading.Thread):
             self.server_handler.handle_message_user(packet, client)
         elif packet.packet_type == 'login':
             requests.send_user_already_logged_in(client.socket)
+        elif packet.packet_type == 'logout':
+            self.server_handler.handle_logout(packet, client)
         else:
             requests.send_invalid_message_type_response(client.socket)
             logging.info("Received an invalid message type: %s.",

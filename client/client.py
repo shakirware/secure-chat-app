@@ -140,6 +140,8 @@ class Client(threading.Thread):
                     username = args[0]
                     password = args[1]
                     self.handler.handle_register(username, password)
+                elif command.lower() == "/logout":
+                    self.handler.handle_logout()
                 else:
                     logging.error("Invalid Command or Insufficient Arguments.")
             except EOFError:

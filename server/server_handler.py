@@ -42,6 +42,7 @@ class ServerHandler:
         handle_public_key_rsa(packet, client): Handles the storage of RSA public key for a client.
         handle_message_user(packet, client): Handles a message from a client to another client.
         handle_login(packet, client): Handles the login process for a client.
+        handle_logout(packet, client): Handles the logout process for a client.
         notify_clients_user_logged_out(username): Notifies all clients that a user has logged out.
         notify_clients_user_logged_in(username): Notifies all clients that a user has logged in.
         notify_x25519_public_key(): Notifies all clients with the X25519 public key of connected clients.
@@ -176,6 +177,29 @@ class ServerHandler:
             self.notify_x25519_public_key()
         else:
             requests.send_login_fail_response(client.socket, packet)
+
+    def handle_logout(self, packet, client):
+        """
+        Handles the logout process for a client.
+
+        Args:
+            packet (Packet): An instance of the Packet class representing the received packet.
+            client (Client): An instance of the Client class representing the connected client.
+        """
+        token = base64.b64decode(packet.token)
+
+        for client in self.server.clients:
+            if client.token == token:
+                username = client.username
+                client.username = None
+                client.rsa_public_key = None
+                client.x25519_public_key = None
+                client.authenticated = False
+                client.token = None
+                self.server.clients.remove(client)
+                self.notify_clients_user_logged_out(username)
+                logging.info("User '%s' successfully logged out.", username)
+                break
 
     def notify_clients_user_logged_out(self, username):
         """

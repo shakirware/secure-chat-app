@@ -7,6 +7,7 @@ Module dependencies:
     - common.packet: Provides the Packet class for constructing response packets.
 
 Functions:
+    - send_login_fail_response(socket, received_packet): Sends a login fail response to the client.
     - send_login_success_response(socket, received_packet): Sends a login success response to the client.
     - send_registration_success_response(socket, received_packet): Sends a registration success response to the client.
     - send_username_already_exists_response(socket, received_packet): Sends a username already exists response to the client.
@@ -28,6 +29,13 @@ from common.packet import Packet
 
 
 def send_login_fail_response(socket, received_packet):
+    """
+    Sends a login fail response to the client.
+
+    Args:
+        socket (socket): The client socket to send the response to.
+        received_packet (Packet): The received packet from the client.
+    """
     packet = Packet(
         'server',
         username=received_packet.username,
@@ -36,7 +44,7 @@ def send_login_fail_response(socket, received_packet):
     )
     json_data = packet.to_json()
     socket.send(json_data.encode('utf-8'))
-    
+
 
 def send_login_success_response(socket, received_packet):
     """

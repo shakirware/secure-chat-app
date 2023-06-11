@@ -67,6 +67,7 @@ class ClientHandler:
         - handle_token(packet): Handles the session token received from the server.
         - handle_public_key(packet): Handles a public key received from another user.
         - handle_offline_messages(packet): Handles offline messages received from the server.
+        - handle_logout(): Handles the logout process.
         - send_encrypted_message(recipient_username, message): Sends an encrypted message to a recipient.
         - get_user_key(msg_username): Retrieves the encryption key for a user.
     """
@@ -178,7 +179,7 @@ class ClientHandler:
         """
         encrypted_token = base64.b64decode(packet.token)
         rsa_private_key = load_rsa_private_key(
-            f"./storage/{self.username}/rsa_private_key.pem"
+            f"./client/storage/{self.username}/rsa_private_key.pem"
         )
         self.token = decrypt_session_token_with_rsa(
             rsa_private_key, encrypted_token)
@@ -204,6 +205,15 @@ class ClientHandler:
             "Public Key from User '%s' has been stored.", packet.owner)
 
     def handle_offline_messages(self, packet):
+        """
+        Handles offline messages received from the server.
+
+        Args:
+            packet (Packet): The packet containing offline messages.
+
+        Returns:
+            None
+        """
         last_key = self.chat_database.get_key(packet.sender)
         key = calculate_message_key(last_key)
 
@@ -215,6 +225,29 @@ class ClientHandler:
 
         logging.info("Received offline message: %s: %s",
                      packet.sender, message)
+
+    def handle_logout(self):
+        """
+        Handles the logout process.
+
+        Returns:
+            None
+        """
+        if self.token:
+            token_b64 = base64.b64encode(self.token).decode('utf-8')
+            packet = Packet('logout', token=token_b64)
+            self.client.message_queue.put(packet)
+
+            logging.info("User '%s' successfully logged out.", self.username)
+
+            self.x25519_public_key = None
+            self.x25519_private_key = None
+            self.token = None
+            self.username = None
+            self.chat_database = None
+            self.users = []
+        else:
+            logging.error("Authentication required: User is not logged in.")
 
     def send_encrypted_message(self, recipient_username, message):
         """

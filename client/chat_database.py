@@ -23,7 +23,7 @@ class ChatDatabase:
 
         """
         self.username = username
-        self.db_file = f"./storage/{self.username}/messages.db"
+        self.db_file = f"./client/storage/{self.username}/messages.db"
         self.create_tables()
 
     def create_tables(self):
@@ -135,10 +135,12 @@ class ChatDatabase:
         with sqlite3.connect(self.db_file) as conn:
             cursor = conn.cursor()
 
-            cursor.execute('''SELECT DISTINCT sender FROM chat_messages WHERE sender != ?''', (self.username,))
+            cursor.execute(
+                '''SELECT DISTINCT sender FROM chat_messages WHERE sender != ?''', (self.username,))
             senders = cursor.fetchall()
 
-            cursor.execute('''SELECT DISTINCT recipient FROM chat_messages WHERE recipient != ?''', (self.username,))
+            cursor.execute(
+                '''SELECT DISTINCT recipient FROM chat_messages WHERE recipient != ?''', (self.username,))
             recipients = cursor.fetchall()
 
             usernames = set([username[0] for username in senders + recipients])
@@ -154,4 +156,3 @@ class ChatDatabase:
                 messages[username] = chat
 
         return messages
-    
