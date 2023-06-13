@@ -1,5 +1,6 @@
 max-clients: 5
-database-file: ./server/db/chatdb.db
+database-file: ./server/storage/chatdb.db
+client-database-file: ./client/storage/{username}/messages.db
 cert-file: ./server/certs/server.crt
 key-file: ./server/certs/server.key
 server-host: localhost

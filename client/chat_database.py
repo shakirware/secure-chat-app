@@ -1,18 +1,37 @@
 """
-Module: chat_database
-
 This module provides a class for managing chat messages in an SQLite database.
 
 Dependencies:
     - sqlite3
 
+Classes:
+    - ChatDatabase: A class for managing chat messages in an SQLite database.
+
 """
 
 import sqlite3
 
+from common.constants import CLIENT_DATABASE_FILE
+
 
 class ChatDatabase:
-    """A class for managing chat messages in an SQLite database."""
+    """
+    A class for managing chat messages in an SQLite database.
+
+    Args:
+        username (str): The username associated with the database.
+
+    Attributes:
+        username (str): The username associated with the database.
+        db_file (str): The file path of the SQLite database file.
+
+    Methods:
+        - __init__(self, username): Initialize a ChatDatabase instance.
+        - create_tables(self): Create the necessary tables in the database.
+        - insert_message(self, sender, recipient, message): Insert a new message into the database.
+        - get_messages(self, username): Retrieve messages for the specified username.
+        - delete_messages(self, username): Delete all messages for the specified username.
+    """
 
     def __init__(self, username):
         """
@@ -23,7 +42,7 @@ class ChatDatabase:
 
         """
         self.username = username
-        self.db_file = f"./client/storage/{self.username}/messages.db"
+        self.db_file = CLIENT_DATABASE_FILE.format(username=username)
         self.create_tables()
 
     def create_tables(self):

@@ -39,6 +39,17 @@ class WebClient(Client):
         return template.render()
 
     @cherrypy.expose
+    @cherrypy.tools.json_in()
+    def send(self, recipient_username=None, message=None):
+        data = cherrypy.request.json
+
+        recipient_username = data.get('recipient_username')
+        message = data.get('message')
+
+        if recipient_username and message:
+            self.handler.send_encrypted_message(recipient_username, message)
+
+    @cherrypy.expose
     @cherrypy.tools.json_out()
     def message(self):
         return self.handler.chat_database.get_all_messages()
@@ -55,3 +66,6 @@ class WebClientHandler(ClientHandler):
 
     def handle_message_user(self, packet):
         super().handle_message_user(packet)
+
+    def send_encrypted_message(self, recipient_username, message):
+        super().send_encrypted_message(recipient_username, message)

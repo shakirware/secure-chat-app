@@ -1,5 +1,40 @@
 let currentTab = null;
 
+function sendMessage() {
+    var messageInput = document.getElementById("messageInput");
+    var message = messageInput.value.trim();
+
+    if (message === "") {
+        alert("Please enter a message.");
+        return;
+    }
+
+	var requestData = {
+	  recipient_username: currentTab,
+	  message: message
+	};
+
+	fetch("/send", {
+	  method: "POST",
+	  headers: {
+		"Content-Type": "application/json"
+	  },
+	  body: JSON.stringify(requestData)
+	})
+	  .then(function(response) {
+		if (response.ok) {
+		  console.log(`Message sent successfully: ${JSON.stringify(requestData)}`);
+		} else {
+		  console.log("Failed to send message.");
+		}
+	  })
+	  .catch(function(error) {
+		console.log("Error occurred while sending the request:", error);
+	  });
+	
+    messageInput.value = "";
+}
+
 function fetchMessages() {
   fetch('/message')
     .then(response => response.json())
@@ -103,3 +138,4 @@ function updateMessageList(user, chatData) {
 }
 
 setInterval(fetchMessages, 1000);
+document.getElementById("sendButton").addEventListener("click", sendMessage);

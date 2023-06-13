@@ -20,6 +20,7 @@ with open('config.yaml', 'r') as file:
 
 MAX_CLIENTS = config['max-clients']
 DATABASE_FILE = config['database-file']
+CLIENT_DATABASE_FILE = config['client-database-file']
 CERT_FILE = config['cert-file']
 KEY_FILE = config['key-file']
 SERVER_HOST = config['server-host']

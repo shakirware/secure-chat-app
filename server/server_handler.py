@@ -16,6 +16,8 @@ Classes:
 import logging
 import base64
 
+from common.constants import DATABASE_FILE
+
 from common.encryption import (
     encrypt_session_token_with_rsa,
     generate_session_token, pem_to_rsa_public_key
@@ -23,11 +25,7 @@ from common.encryption import (
 
 import server.req as requests
 
-from server.database import (
-    get_rsa_public_key, authenticate_user,
-    is_valid_credentials, register_user,
-    store_rsa_public_key
-)
+from server.database import ServerDatabase
 
 
 class ServerHandler:
@@ -57,6 +55,7 @@ class ServerHandler:
             server (Server): An instance of the Server class representing the server.
         """
         self.server = server
+        self.server_database = ServerDatabase(DATABASE_FILE)
         self.pending_messages = {}
 
     def handle_register(self, packet, client):
@@ -70,8 +69,8 @@ class ServerHandler:
         username = packet.username
         password = packet.password
 
-        if is_valid_credentials(username, password):
-            if register_user(username, password):
+        if self.server_database.is_valid_credentials(username, password):
+            if self.server_database.register_user(username, password):
                 log_message = f"Successfully registered user: {username}"
                 requests.send_registration_success_response(
                     client.socket, packet)
@@ -96,7 +95,7 @@ class ServerHandler:
         rsa_public_key = base64.b64decode(packet.public_key)
         username = packet.username
 
-        if store_rsa_public_key(username, rsa_public_key):
+        if self.server_database.store_rsa_public_key(username, rsa_public_key):
             log_message = f"RSA Public Key stored in database for user: {username}"
             requests.send_rsa_public_key_stored(client.socket)
         else:
@@ -142,7 +141,7 @@ class ServerHandler:
             requests.send_user_already_logged_in(client.socket)
             return
 
-        if authenticate_user(username, packet.password):
+        if self.server_database.authenticate_user(username, packet.password):
             logging.info("User '%s' successfully authenticated.", username)
             client.authenticated = True
             client.username = username
@@ -152,7 +151,8 @@ class ServerHandler:
             logging.info("X25519 Public Key for user '%s': %s",
                          client.username, client.x25519_public_key.hex())
 
-            pem_rsa_public_key = get_rsa_public_key(username)
+            pem_rsa_public_key = self.server_database.get_rsa_public_key(
+                username)
             client.rsa_public_key = pem_to_rsa_public_key(pem_rsa_public_key)
 
             client.token = generate_session_token()
