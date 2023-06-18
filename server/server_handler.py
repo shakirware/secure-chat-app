@@ -114,6 +114,7 @@ class ServerHandler:
         """
         token = base64.b64decode(packet.token)
         if token == client.token:
+            packet.data.pop('token')
             recipient = next(
                 (c for c in self.server.clients if c.username == packet.recipient), None)
             if recipient is None:
@@ -125,7 +126,7 @@ class ServerHandler:
                 recipient.socket.send(json_data.encode('utf-8'))
         else:
             logging.info("Invalid token received from user '%s'.",
-                         client.username)
+                         client.username)       
 
     def handle_login(self, packet, client):
         """

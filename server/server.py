@@ -131,6 +131,8 @@ class Server(threading.Thread):
         """
         if packet.packet_type == 'message':
             self.server_handler.handle_message_user(packet, client)
+        elif packet.packet_type == 'group':
+            self.server_handler.handle_message_user(packet, client)
         elif packet.packet_type == 'login':
             requests.send_user_already_logged_in(client.socket)
         elif packet.packet_type == 'logout':

@@ -13,6 +13,9 @@ import sqlite3
 
 from common.constants import CLIENT_DATABASE_FILE
 
+from client.user import User
+
+from client.group import Group
 
 class ChatDatabase:
     """
@@ -62,6 +65,12 @@ class ChatDatabase:
             cursor.execute('''CREATE TABLE IF NOT EXISTS latest_key
                               (user TEXT PRIMARY KEY,
                                key INTEGER)''')
+                               
+            cursor.execute('''CREATE TABLE IF NOT EXISTS latest_group_key
+                              (group_name TEXT,
+                               member TEXT,
+                               key INTEGER,
+                               PRIMARY KEY (group_name, member))''')
 
     def insert_message(self, sender, recipient, message, timestamp):
         """
@@ -85,61 +94,16 @@ class ChatDatabase:
         Insert or replace the latest encryption key for a user.
 
         Args:
-            user (str): The username associated with the key.
+            user (User): The User object associated with the key.
             key (int): The latest encryption key.
-
         """
         with sqlite3.connect(self.db_file) as conn:
             cursor = conn.cursor()
 
             cursor.execute('''INSERT OR REPLACE INTO latest_key (user, key)
-                              VALUES (?, ?)''', (user, key))
+                              VALUES (?, ?)''', (user.username, key))
 
-    def get_usernames(self):
-        """
-        Retrieve a list of all usernames in chat_messages that are not equal to self.username.
 
-        Returns:
-            list: A list of usernames.
-
-        """
-        with sqlite3.connect(self.db_file) as conn:
-            cursor = conn.cursor()
-
-            cursor.execute(
-                '''SELECT DISTINCT sender FROM chat_messages WHERE sender != ?''', (self.username,))
-            senders = cursor.fetchall()
-
-            cursor.execute(
-                '''SELECT DISTINCT recipient FROM chat_messages WHERE recipient != ?''', (self.username,))
-            recipients = cursor.fetchall()
-
-            usernames = set([username[0] for username in senders + recipients])
-
-            return list(usernames)
-
-    def get_key(self, user):
-        """
-        Retrieve the latest encryption key for a specific user.
-
-        Args:
-            user (str): The username associated with the key.
-
-        Returns:
-            int: The latest encryption key for the user, or None if the user doesn't exist.
-
-        """
-        with sqlite3.connect(self.db_file) as conn:
-            cursor = conn.cursor()
-
-            cursor.execute(
-                '''SELECT key FROM latest_key WHERE user = ?''', (user,))
-            result = cursor.fetchone()
-
-            if result:
-                return result[0]
-            else:
-                return None
 
     def get_all_messages(self):
         """
@@ -175,3 +139,68 @@ class ChatDatabase:
                 messages[username] = chat
 
         return messages
+
+    def insert_group(self, group):
+        """
+        Insert a Group object in the database.
+
+        Args:
+            group (Group): The Group object to store.
+
+        """
+        with sqlite3.connect(self.db_file) as conn:
+            cursor = conn.cursor()
+
+            for member, key in group.member_keys.items():
+                cursor.execute('''INSERT OR REPLACE INTO group_member_keys (group_name, member, key)
+                                  VALUES (?, ?, ?)''', (group.name, member, key))
+
+    def get_all_groups(self):
+        """
+        Retrieve all groups from the database and return an array of Group objects.
+
+        Returns:
+            list: An array of Group objects.
+
+        """
+        groups = []
+
+        with sqlite3.connect(self.db_file) as conn:
+            cursor = conn.cursor()
+
+            # Retrieve unique group names
+            cursor.execute('''SELECT DISTINCT group_name FROM latest_group_key''')
+            group_names = cursor.fetchall()
+
+            # Retrieve member keys for each group
+            for group_name in group_names:
+                cursor.execute('''SELECT member, key FROM latest_group_key WHERE group_name = ?''', (group_name[0],))
+                
+                group = Group(group_name[0], members)
+                group.member_keys = {row[0]: row[1] for row in cursor.fetchall()}
+                groups.append(group)
+
+        return groups
+
+    def get_all_users(self):
+        """
+        Retrieve all users from the database and return a list of User objects.
+
+        Returns:
+            list: A list of User objects.
+        """
+        users = []
+
+        with sqlite3.connect(self.db_file) as conn:
+            cursor = conn.cursor()
+
+            cursor.execute('''SELECT user, key FROM latest_key''')
+            rows = cursor.fetchall()
+
+            for username, key in rows:
+                user = User(username, None)
+                user.key = key
+                user.online = False
+                users.append(user)
+
+        return users

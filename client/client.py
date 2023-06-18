@@ -101,6 +101,8 @@ class Client(threading.Thread):
                     self.handler.handle_token(packet)
                 elif packet.packet_type == 'message':
                     self.handler.handle_message_user(packet)
+                elif packet.packet_type == 'group':
+                    self.handler.handle_message_group(packet)
                 elif packet.packet_type == 'server':
                     self.handler.handle_message_server(packet)
                 elif packet.packet_type == 'public_key':
@@ -131,7 +133,11 @@ class Client(threading.Thread):
                 if command.lower() == "/msg" and len(args) >= 2:
                     recipient = args[0]
                     message = ' '.join(args[1:])
-                    self.handler.send_encrypted_message(recipient, message)
+                    self.handler.send_encrypted_message(message, recipient)
+                elif command.lower() == "/group" and len(args) >= 2:
+                    members = sorted(list(set(args[0].split(','))))
+                    message = ' '.join(args[1:])
+                    self.handler.send_group_message(message, members) 
                 elif command.lower() == "/login" and len(args) == 2:
                     username = args[0]
                     password = args[1]
