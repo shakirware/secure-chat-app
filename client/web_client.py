@@ -104,6 +104,25 @@ class WebClient(Client):
             self.handler.send_encrypted_message(message, recipient_username)
 
     @cherrypy.expose
+    @cherrypy.tools.json_in()
+    def send_group(self, members=None, message=None):
+        """
+        Sends an encrypted message.
+
+        Args:
+            recipient_username (str): The username of the recipient.
+            message (str): The message content.
+
+        """
+        data = cherrypy.request.json
+
+        members = data.get('members')
+        message = data.get('message')
+
+        if members and message:
+            self.handler.send_group_message(message, members)
+
+    @cherrypy.expose
     @cherrypy.tools.json_out()
     def message(self):
         """
@@ -113,7 +132,12 @@ class WebClient(Client):
             list: The list of messages.
 
         """
-        return self.handler.chat_database.get_all_messages()
+        messages = {
+            'messages': self.handler.chat_database.get_all_messages(),
+            'group': self.handler.chat_database.get_all_group_messages()
+        
+        }
+        return messages
 
 
 class WebClientHandler(ClientHandler):

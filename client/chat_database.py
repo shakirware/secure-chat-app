@@ -62,6 +62,14 @@ class ChatDatabase:
                                recipient TEXT,
                                message TEXT,
                                timestamp TEXT)''')
+                               
+            cursor.execute('''CREATE TABLE IF NOT EXISTS group_messages
+                              (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                               members TEXT,
+                               sender TEXT,
+                               recipient TEXT,
+                               message TEXT,
+                               timestamp TEXT)''')
 
             cursor.execute('''CREATE TABLE IF NOT EXISTS latest_key
                               (user TEXT PRIMARY KEY,
@@ -72,6 +80,16 @@ class ChatDatabase:
                                member TEXT,
                                key INTEGER,
                                PRIMARY KEY (group_name, member))''')
+
+    def insert_group_message(self, members, sender, recipient, message, timestamp):
+        with sqlite3.connect(self.db_file) as conn:
+            cursor = conn.cursor()
+            
+            members_str = ",".join(members)
+            
+            cursor.execute("INSERT INTO group_messages (members, sender, recipient, message, timestamp) VALUES (?, ?, ?, ?, ?)",
+                       (members_str, sender, recipient, message, timestamp))
+            
 
     def insert_message(self, sender, recipient, message, timestamp):
         """
@@ -89,7 +107,6 @@ class ChatDatabase:
 
             cursor.execute('''INSERT INTO chat_messages (sender, recipient, message, timestamp)
                               VALUES (?, ?, ?, ?)''', (sender, recipient, message, timestamp))
-
     def insert_key(self, user, key):
         """
         Insert or replace the latest encryption key for a user.
@@ -103,6 +120,52 @@ class ChatDatabase:
 
             cursor.execute('''INSERT OR REPLACE INTO latest_key (user, key)
                               VALUES (?, ?)''', (user.username, key))
+
+    def insert_group(self, group):
+        """
+        Insert a Group object in the database.
+
+        Args:
+            group (Group): The Group object to store.
+
+        """
+        with sqlite3.connect(self.db_file) as conn:
+            cursor = conn.cursor()
+
+            for member, key in group.member_keys.items():
+                cursor.execute('''INSERT OR REPLACE INTO latest_group_key (group_name, member, key)
+                                  VALUES (?, ?, ?)''', (group.name, member, key))
+                                  
+    def get_all_group_messages(self):
+        """
+        Retrieve all group messages from the database and store them in a dictionary.
+
+        Returns:
+            dict: A dictionary containing arrays of messages for each group.
+
+        """
+        group_messages = {}
+
+        with sqlite3.connect(self.db_file) as conn:
+            cursor = conn.cursor()
+
+            cursor.execute('''SELECT DISTINCT members FROM group_messages''')
+            groups = cursor.fetchall()
+
+            for group in groups:
+                members = group[0]
+                
+                cursor.execute('''SELECT sender, recipient, message, timestamp
+                                  FROM group_messages
+                                  WHERE members = ?
+                                  ORDER BY timestamp''',
+                               (members,))
+                messages = cursor.fetchall()
+                group_messages[members] = messages
+
+        return group_messages
+
+
 
     def get_all_messages(self):
         """
@@ -138,22 +201,7 @@ class ChatDatabase:
                 messages[username] = chat
 
         return messages
-
-    def insert_group(self, group):
-        """
-        Insert a Group object in the database.
-
-        Args:
-            group (Group): The Group object to store.
-
-        """
-        with sqlite3.connect(self.db_file) as conn:
-            cursor = conn.cursor()
-
-            for member, key in group.member_keys.items():
-                cursor.execute('''INSERT OR REPLACE INTO latest_group_key (group_name, member, key)
-                                  VALUES (?, ?, ?)''', (group.name, member, key))
-
+    
     def get_all_groups(self):
         """
         Retrieve all groups from the database and return an array of Group objects.

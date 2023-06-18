@@ -128,7 +128,10 @@ class ClientHandler:
         logging.info('Received Group Key = %s', key.hex())
         
         message = decrypt_message_with_aes(packet.message, key)
-        logging.info('Received Offline Group Msg: %s: %s', packet.sender, message)
+        
+        self.chat_database.insert_group_message(group.members, packet.sender, packet.recipient, message, packet.timestamp)
+        
+        logging.info('Received Group Msg: %s: %s', packet.sender, message)
 
     def handle_login(self, username, password):
         """
@@ -264,6 +267,9 @@ class ClientHandler:
 
                 logging.info('Getting stored Group Key = %s', key.hex())
                 message = decrypt_message_with_aes(packet.message, key)
+                
+                self.chat_database.insert_group_message(group.members, self.username, packet.recipient, message, packet.timestamp)
+                
                 logging.info('Received Offline Group Msg: %s: %s', packet.sender, message)
         else:
             key = self.get_user_key(packet.sender)
@@ -388,6 +394,8 @@ class ClientHandler:
             )
 
             self.client.message_queue.put(packet)
+            
+            self.chat_database.insert_group_message(group.members, packet.sender, packet.recipient, message, timestamp)
 
         members_str = ','.join(members)
         logging.info('GROUP (%s) - %s: %s', members_str, self.username, message)

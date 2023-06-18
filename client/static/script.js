@@ -1,4 +1,5 @@
 let currentTab = null;
+let groupTab = false;
 
 function sendMessage() {
     var messageInput = document.getElementById("messageInput");
@@ -9,6 +10,36 @@ function sendMessage() {
         return;
     }
 
+	
+	if (groupTab == true) {
+        var requestData = {
+			members: currentTab.split(','),
+			message: message
+		};
+		
+		fetch("/send_group", {
+	  method: "POST",
+	  headers: {
+		"Content-Type": "application/json"
+	  },
+	  body: JSON.stringify(requestData)
+	})
+	  .then(function(response) {
+		if (response.ok) {
+		  console.log(`Message sent successfully: ${JSON.stringify(requestData)}`);
+		} else {
+		  console.log("Failed to send message.");
+		}
+	  })
+	  .catch(function(error) {
+		console.log("Error occurred while sending the request:", error);
+	  });
+	
+    messageInput.value = "";		
+		
+    }
+    else {
+        
 	var requestData = {
 	  recipient_username: currentTab,
 	  message: message
@@ -33,6 +64,7 @@ function sendMessage() {
 	  });
 	
     messageInput.value = "";
+	}
 }
 
 function fetchMessages() {
@@ -43,10 +75,13 @@ function fetchMessages() {
     });
 }
 
-function updateTabList(chatData) {
+function updateTabList(messageData) {
   const tabsContainer = document.getElementById("chatsTab");
   tabsContainer.innerHTML = '';
-
+	
+  chatData = messageData['messages']
+  groupData = messageData['group']
+	
   for (const user in chatData) {
     const messages = chatData[user];
     const lastMessage = messages[messages.length - 1];
@@ -61,6 +96,7 @@ function updateTabList(chatData) {
     chatItem.onclick = function() {
       updateMessageList(user, chatData);
       currentTab = user;
+	  groupTab = false;
     };
 
     const contentWrapper = document.createElement("div");
@@ -85,10 +121,62 @@ function updateTabList(chatData) {
 
     tabsContainer.appendChild(chatItem);
   }
+  
+  for (const group in groupData) {
+	  
+	const groupName = group
+	const messages = groupData[group]
+	  
+	const lastMessage = messages[messages.length - 1];
+	const timestamp = lastMessage[3];
+    const msg = lastMessage[2];
+    const sender = lastMessage[0];
+    const readableDate = new Date(timestamp * 1000).toLocaleString();
+  
+	const chatItem = document.createElement("a");
+    chatItem.classList = "text-decoration-none py-2 px-3 mx-3 my-1 chatMessage";
+    chatItem.href = "#";
+    chatItem.onclick = function() {
+      updateMessageList(groupName, groupData);
+      currentTab = groupName;
+	  groupTab = true;
+    };
 
-  if (currentTab != null) {
-    updateMessageList(currentTab, chatData);
+    const contentWrapper = document.createElement("div");
+    contentWrapper.classList = "d-flex w-100 align-items-center justify-content-between";
+
+    const title = document.createElement("strong");
+    title.classList = "mb-1";
+    title.innerHTML = groupName;
+
+    const date = document.createElement("small");
+    date.innerHTML = readableDate;
+
+    contentWrapper.appendChild(title);
+    contentWrapper.appendChild(date);
+
+    const description = document.createElement("div");
+    description.classList = "col-10 mb-1 small";
+    description.innerHTML = msg;
+
+    chatItem.appendChild(contentWrapper);
+    chatItem.appendChild(description);
+
+    tabsContainer.appendChild(chatItem);
+  
   }
+  
+  
+  if (currentTab != null) {
+    if (groupTab == true) {
+        updateMessageList(currentTab, groupData);
+    }
+    else {
+        updateMessageList(currentTab, chatData);
+    }
+	}
+
+  
 }
 
 function updateMessageList(user, chatData) {
