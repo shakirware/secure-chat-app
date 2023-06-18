@@ -124,6 +124,7 @@ class WebClientHandler(ClientHandler):
         client (WebClient): The client instance.
 
     """
+
     def __init__(self, client):
         super().__init__(client)
 

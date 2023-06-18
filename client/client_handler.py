@@ -107,39 +107,28 @@ class ClientHandler:
             packet.sender, packet.recipient, message, packet.timestamp)
 
         logging.info('%s: %s', packet.sender, message)
-        
+
     def handle_message_group(self, packet):
-        # Check if group exists
         group = self.find_group_by_members(packet.members)
-        
+
         if not group:
-            # Check if all members exist + online before creating the group
             for member in packet.members:
                 if member == self.username:
                     continue
-                if not self.user_exists(member) or not self.user_online(member):
-                    logging.error("User '%s' not found/offline. Users must be online to create group for DH.", member)
+                elif not self.user_exists(member):
+                    logging.error("User '%s' not found", member)
+                    return
+                elif not self.user_online(member):
+                    logging.error("User '%s' offline.", member)
                     return
             group = Group(packet.members)
-            
-        self.groups.append(group)
-        
+            self.groups.append(group)
+
         key = self.get_group_key(group, packet.sender)
-        message = decrypt_message_with_aes(packet.message, key)
-    
-        print(message)
+        logging.info('Received Group Key = %s', key.hex())
         
-        """
-        packet = Packet(
-                'group',
-                members=group.members,
-                sender=self.username,
-                recipient=member,
-                message=encrypted_message_b64,
-                token=token_b64,
-                timestamp=int(time.time()),
-            )
-        """
+        message = decrypt_message_with_aes(packet.message, key)
+        logging.info('Received Offline Group Msg: %s: %s', packet.sender, message)
 
     def handle_login(self, username, password):
         """
@@ -194,10 +183,10 @@ class ClientHandler:
             logging.info("Login was successful.")
             self.username = packet.username
             self.chat_database = ChatDatabase(self.username)
-            
+
             self.groups = self.chat_database.get_all_groups()
             self.users = self.chat_database.get_all_users()
-            
+
         elif packet.status_code == USER_LOGGED_OUT:
             for user in self.users:
                 if user.username == packet.username:
@@ -237,13 +226,14 @@ class ClientHandler:
         x25519_public_key = x25519.X25519PublicKey.from_public_bytes(
             x25519_public_key_bytes
         )
-        
-        existing_user = next((user for user in self.users if user.username == packet.owner), None)
+
+        existing_user = next(
+            (user for user in self.users if user.username == packet.owner), None)
 
         if existing_user:
             existing_user.x25519_public_key = x25519_public_key
             existing_user.online = True
-            existing_user.key = None # reset key for DH
+            existing_user.key = None  # reset key for DH
         else:
             user = User(packet.owner, x25519_public_key)
             user.online = True
@@ -262,20 +252,34 @@ class ClientHandler:
         Returns:
             None
         """
-        
-        key = self.get_user_key(packet.sender)
-        
-        if not key:
-            logging.error('No decryption key for user %s', packet.sender)
-            return
 
-        message = decrypt_message_with_aes(packet.message, key)
+        if packet.members:
+            group = self.find_group_by_members(packet.members)
+            if group:
+                key = self.get_group_key(group, packet.sender)
 
-        self.chat_database.insert_message(
-            packet.sender, packet.recipient, message, packet.timestamp)
+                if not key:
+                    logging.error('No decryption key for user %s in Group %s', packet.sender, group.name)
+                    return
 
-        logging.info("Received offline message: %s: %s",
-                     packet.sender, message)
+                logging.info('Getting stored Group Key = %s', key.hex())
+                message = decrypt_message_with_aes(packet.message, key)
+                logging.info('Received Offline Group Msg: %s: %s', packet.sender, message)
+        else:
+            key = self.get_user_key(packet.sender)
+
+            if not key:
+                logging.error('No decryption key for user %s', packet.sender)
+                return
+
+            message = decrypt_message_with_aes(packet.message, key)
+
+            self.chat_database.insert_message(
+                packet.sender, packet.recipient, message, packet.timestamp)
+
+            logging.info("Received Offline Message: %s: %s",
+                         packet.sender, message)
+
 
     def handle_logout(self):
         """
@@ -290,14 +294,7 @@ class ClientHandler:
             self.client.message_queue.put(packet)
 
             logging.info("User '%s' successfully logged out.", self.username)
-
-            self.x25519_public_key = None
-            self.x25519_private_key = None
-            self.token = None
-            self.username = None
-            self.chat_database = None
-            self.users = []
-            self.groups = []
+            self.__init__(self.client)
         else:
             logging.error("Authentication required: User is not logged in.")
 
@@ -334,7 +331,7 @@ class ClientHandler:
             packet.sender, packet.recipient, message, packet.timestamp)
 
         logging.info('%s: %s', self.username, message)
-        
+
     def send_group_message(self, message, members):
         """
         Sends a message to a group of members.
@@ -346,6 +343,9 @@ class ClientHandler:
         Returns:
             None
         """
+        members.append(self.username)
+        members = sorted(set(members))
+
         if len(members) < 2:
             logging.error("Please provide at least two unique usernames for the group.")
             return
@@ -353,24 +353,30 @@ class ClientHandler:
         # Check if group exists
         group = self.find_group_by_members(members)
         if not group:
-            # Check if all members exist + online before creating the group
+            # Check if all members exist and are online before creating the group
             for member in members:
-                if not self.user_exists(member) or not self.user_online(member):
-                    logging.error("User '%s' not found/offline. Users must be online to create group for DH.", member)
+                if member == self.username:
+                    continue
+                elif not self.user_exists(member):
+                    logging.error("User '%s' not found", member)
                     return
-            group = Group(members)
-            
-        self.groups.append(group)
+                elif not self.user_online(member):
+                    logging.error("User '%s' offline.", member)
+                    return
 
-        # Send message to the group members
+            group = Group(members)
+            self.groups.append(group)
+
+
         for member in group.members:
+            if member == self.username:
+                continue
+
             key = self.get_group_key(group, member)
-            
-            encrypted_message_b64 = encrypt_message_with_aes(
-            message, key)
-            
+            encrypted_message_b64 = encrypt_message_with_aes(message, key)
             token_b64 = base64.b64encode(self.token).decode('utf-8')
-            
+            timestamp = int(time.time())
+
             packet = Packet(
                 'group',
                 members=group.members,
@@ -378,13 +384,14 @@ class ClientHandler:
                 recipient=member,
                 message=encrypted_message_b64,
                 token=token_b64,
-                timestamp=int(time.time()),
+                timestamp=timestamp
             )
-            
+
             self.client.message_queue.put(packet)
-        
+
         members_str = ','.join(members)
         logging.info('GROUP (%s) - %s: %s', members_str, self.username, message)
+
 
     def find_group_by_members(self, members):
         """
@@ -401,7 +408,6 @@ class ClientHandler:
                 return group
         return None
 
-
     def user_exists(self, username):
         """
         Checks if a user exists based on their username.
@@ -416,7 +422,7 @@ class ClientHandler:
             if user.username == username:
                 return True
         return False
-    
+
     def user_online(self, username):
         """
         Checks if a user with the given username is online.
@@ -432,8 +438,6 @@ class ClientHandler:
                 return True
         return False
 
-
-        
     def get_user_key(self, username):
         """
         Retrieves the encryption key for a user.
@@ -457,7 +461,7 @@ class ClientHandler:
             else:
                 key = calculate_message_key(msg_user.key)
                 logging.info("Generated key using HKDF: %s", key.hex())
-                
+
             msg_user.key = key
             self.chat_database.insert_key(msg_user, key)
         else:
@@ -466,20 +470,22 @@ class ClientHandler:
 
         return key
 
-
     def get_group_key(self, group, member):
         member_user = next(
             (user for user in self.users if user.username == member), None)
-        
-        if not group.get_member_key(member):
+
+        member_key = group.get_member_key(member)
+
+        if not member_key:
             shared_secret = calculate_x25519_shared_secret(
-                    self.x25519_private_key, member_user.x25519_public_key)
-            key = calculate_message_key(shared_secret)     
+                self.x25519_private_key, member_user.x25519_public_key)
+            key = calculate_message_key(shared_secret)
             logging.info(
-                    "Generated Group key from Diffie-Hellman shared secret: %s", key.hex())
+                "Generated Group key from Diffie-Hellman shared secret: %s", key.hex())
         else:
-            previous_key = group.get_member_key(member)
-            key = calculate_message_key(previous_key)
-            
+            key = calculate_message_key(member_key)
+            logging.info("Generated key using HKDF: %s", key.hex())
+
         group.set_member_key(member, key)
+        self.chat_database.insert_group(group)
         return key

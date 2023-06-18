@@ -30,20 +30,30 @@ class Group:
         """
         return self._members
 
+    @members.setter
+    def members(self, members):
+        """
+        Sets the members attribute with the provided set of members.
+
+        Args:
+            members (set): Set of members in the group chat.
+        """
+        self._members = members
+
     @property
     def member_keys(self):
         """
         dict: Dictionary to store keys for each member in the group.
         """
         return self._member_keys
-        
+
     @property
     def name(self):
         """
         str: Comma-separated string of the group members' names.
         """
         return ",".join(self._members)
-        
+
     @member_keys.setter
     def member_keys(self, keys):
         """

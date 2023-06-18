@@ -126,7 +126,7 @@ class ServerHandler:
                 recipient.socket.send(json_data.encode('utf-8'))
         else:
             logging.info("Invalid token received from user '%s'.",
-                         client.username)       
+                         client.username)
 
     def handle_login(self, packet, client):
         """

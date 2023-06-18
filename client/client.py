@@ -135,9 +135,9 @@ class Client(threading.Thread):
                     message = ' '.join(args[1:])
                     self.handler.send_encrypted_message(message, recipient)
                 elif command.lower() == "/group" and len(args) >= 2:
-                    members = sorted(list(set(args[0].split(','))))
+                    members = args[0].split(',')
                     message = ' '.join(args[1:])
-                    self.handler.send_group_message(message, members) 
+                    self.handler.send_group_message(message, members)
                 elif command.lower() == "/login" and len(args) == 2:
                     username = args[0]
                     password = args[1]

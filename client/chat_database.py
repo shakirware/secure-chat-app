@@ -17,6 +17,7 @@ from client.user import User
 
 from client.group import Group
 
+
 class ChatDatabase:
     """
     A class for managing chat messages in an SQLite database.
@@ -65,7 +66,7 @@ class ChatDatabase:
             cursor.execute('''CREATE TABLE IF NOT EXISTS latest_key
                               (user TEXT PRIMARY KEY,
                                key INTEGER)''')
-                               
+
             cursor.execute('''CREATE TABLE IF NOT EXISTS latest_group_key
                               (group_name TEXT,
                                member TEXT,
@@ -102,8 +103,6 @@ class ChatDatabase:
 
             cursor.execute('''INSERT OR REPLACE INTO latest_key (user, key)
                               VALUES (?, ?)''', (user.username, key))
-
-
 
     def get_all_messages(self):
         """
@@ -152,7 +151,7 @@ class ChatDatabase:
             cursor = conn.cursor()
 
             for member, key in group.member_keys.items():
-                cursor.execute('''INSERT OR REPLACE INTO group_member_keys (group_name, member, key)
+                cursor.execute('''INSERT OR REPLACE INTO latest_group_key (group_name, member, key)
                                   VALUES (?, ?, ?)''', (group.name, member, key))
 
     def get_all_groups(self):
@@ -169,15 +168,18 @@ class ChatDatabase:
             cursor = conn.cursor()
 
             # Retrieve unique group names
-            cursor.execute('''SELECT DISTINCT group_name FROM latest_group_key''')
+            cursor.execute(
+                '''SELECT DISTINCT group_name FROM latest_group_key''')
             group_names = cursor.fetchall()
 
             # Retrieve member keys for each group
             for group_name in group_names:
-                cursor.execute('''SELECT member, key FROM latest_group_key WHERE group_name = ?''', (group_name[0],))
-                
-                group = Group(group_name[0], members)
-                group.member_keys = {row[0]: row[1] for row in cursor.fetchall()}
+                cursor.execute(
+                    '''SELECT member, key FROM latest_group_key WHERE group_name = ?''', (group_name[0],))
+                members = group_name[0].split(',')
+                group = Group(members)
+                group.member_keys = {row[0]: row[1]
+                                     for row in cursor.fetchall()}
                 groups.append(group)
 
         return groups
