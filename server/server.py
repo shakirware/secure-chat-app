@@ -20,6 +20,7 @@ Classes:
 import logging
 import socket
 import ssl
+import sys
 import threading
 import json
 
@@ -71,6 +72,7 @@ class Server(threading.Thread):
         self.keyfile = keyfile
         self.clients = []
         self.server_handler = ServerHandler(self)
+        self.running = True
 
     def handle_client(self, client):
         """
@@ -93,6 +95,9 @@ class Server(threading.Thread):
                     self.handle_unauthenticated_message(packet, client)
 
             except json.decoder.JSONDecodeError:
+                break
+                
+            except ssl.SSLEOFError:
                 break
 
         if client.authenticated:
@@ -147,18 +152,26 @@ class Server(threading.Thread):
         Starts the server and listens for client connections.
         """
         ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        ssl_context.load_cert_chain(
-            certfile=self.certfile, keyfile=self.keyfile)
+        ssl_context.load_cert_chain(certfile=self.certfile, keyfile=self.keyfile)
 
         with socket.create_server((self.host, self.port)) as server_socket:
+            server_socket.settimeout(0.5)
             with ssl_context.wrap_socket(server_socket, server_side=True) as server_socket_ssl:
                 logging.info('Server started on %s:%s.', self.host, self.port)
-                while True:
-                    client_socket_ssl, client_address = server_socket_ssl.accept()
-                    logging.info('New client connected from %s.',
-                                 client_address)
+                while self.running:
+                    try:
+                        client_socket_ssl, client_address = server_socket_ssl.accept()
+                        logging.info('New client connected from %s.', client_address)
 
-                    client = Client(client_socket_ssl)
-                    client_thread = threading.Thread(
-                        target=self.handle_client, args=(client,))
-                    client_thread.start()
+                        client = Client(client_socket_ssl)
+                        client_thread = threading.Thread(target=self.handle_client, args=(client,))
+                        client_thread.start()
+                    except socket.timeout:
+                        if not self.running:
+                            break
+
+    def stop(self):
+        """
+        Stops the client and terminates all threads.
+        """
+        self.running = False

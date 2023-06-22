@@ -144,7 +144,6 @@ class ServerHandler:
 
         if self.server_database.authenticate_user(username, packet.password):
             logging.info("User '%s' successfully authenticated.", username)
-            client.authenticated = True
             client.username = username
             requests.send_login_success_response(client.socket, packet)
 
@@ -166,6 +165,7 @@ class ServerHandler:
             logging.info("Session token generated for user '%s': %s",
                          username, client.token)
 
+            client.authenticated = True
             self.server.clients.append(client)
 
             pending_messages = self.pending_messages.pop(username, None)

@@ -18,6 +18,7 @@ Classes:
 import logging
 import socket
 import ssl
+import sys
 import threading
 import traceback
 
@@ -162,10 +163,11 @@ class Client(threading.Thread):
         """
         ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
         ssl_context.load_verify_locations(self.cert_file)
-
+        
         with socket.create_connection((self.host, self.port), self.interface) as client_socket:
             with ssl_context.wrap_socket(client_socket, server_hostname=self.host) as socket_ssl:
                 logging.info("Connection established with the server.")
+                
                 self.socket_ssl = socket_ssl
 
                 receive_thread = threading.Thread(target=self.receive_messages)
@@ -174,7 +176,16 @@ class Client(threading.Thread):
                 send_thread = threading.Thread(target=self.send_messages)
                 send_thread.start()
 
-                self.get_user_input()
+                input_thread = threading.Thread(target=self.get_user_input)
+                input_thread.start()
+                
+                while self.running:
+                    if not self.running:
+                        break
 
-        receive_thread.join()
-        send_thread.join()
+
+    def stop(self):
+        """
+        Stops the client and terminates all threads.
+        """
+        self.running = False

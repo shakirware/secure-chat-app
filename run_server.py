@@ -2,7 +2,7 @@ import logging
 import sys
 import server
 from common.constants import *
-
+"""
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s [%(levelname)s] %(message)s')
 
@@ -15,3 +15,18 @@ try:
 except KeyboardInterrupt:
     logging.info('Received keyboard interrupt, quitting threads.')
     sys.exit()
+"""
+
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s [%(levelname)s] %(message)s')
+
+server = server.Server(SERVER_HOST, SERVER_PORT, CERT_FILE, KEY_FILE)
+
+server.start()
+
+try:
+    while True:
+        pass
+except KeyboardInterrupt:
+    logging.info('Received keyboard interrupt, stopping the server.')
+    server.stop()
