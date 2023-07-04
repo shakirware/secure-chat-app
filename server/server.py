@@ -23,8 +23,11 @@ import ssl
 import sys
 import threading
 import json
+import os
 
 from common.packet import Packet
+
+from server.certificate_generator import generate_server_certificates
 
 import server.req as requests
 
@@ -151,6 +154,11 @@ class Server(threading.Thread):
         """
         Starts the server and listens for client connections.
         """
+        if not os.path.exists(self.certfile) or not os.path.exists(self.keyfile):
+            generate_server_certificates(self.keyfile, self.certfile)
+            logging.info('Successfully generated a self-signed certificate for the server.')
+            
+        
         ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         ssl_context.load_cert_chain(certfile=self.certfile, keyfile=self.keyfile)
 

@@ -50,6 +50,8 @@ class TestClientHandler(ClientHandler):
 
         self.client.message_server_event.set()
 
+    def handle_message_group(self, packet):
+        super().handle_message_server(packet)
 
 class TestChat(unittest.TestCase):
     @classmethod
@@ -80,7 +82,6 @@ class TestChat(unittest.TestCase):
         self.client.handler.handle_login('bobby', 'test')
         self.client.message_server_event.wait()
         self.assertEqual(self.client.login_successful, False)
-
 
 if __name__ == '__main__':
     unittest.main()
