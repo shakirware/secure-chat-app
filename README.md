@@ -13,6 +13,11 @@
 - **Command-Line Interface:** The project provides a command-line interface (CLI) that allows users to interact with the chat application via a text-based interface.
 - **Graphical Web Interface:** The project also includes a graphical web interface built using CherryPy, offering a user-friendly way to access and use the chat application.
 
+![main_page](https://github.com/shakirware/secure-chat-app/assets/25272123/a49af094-3e90-4b90-a4c1-c385fa4b0575)
+![server_command_interface_1](https://github.com/shakirware/secure-chat-app/assets/25272123/906e2b61-d1c6-4067-bf51-fab9dd503099)
+![testing_4](https://github.com/shakirware/secure-chat-app/assets/25272123/69e96ec3-ccb7-43b0-ae4a-12bf0d699e8e)
+
+
 ## License
 
 [MIT License](https://opensource.org/licenses/MIT)
