@@ -10,6 +10,7 @@
 - **Session Tokens:** Session tokens are generated using long-term RSA keys and encrypted to maintain the security of each session.
 - **SQLite Server Database:** User information is securely stored in an SQLite server database. The database implements hashing and salting techniques to protect user credentials.
 - **Group Chats:** Messages can be exchanged in a group setting where all messages are securely encrypted.
+- - **Offline Messaging:** Messages can be exchanged while one user is offline.
 - **Client Databases:** Each client maintains its own local database to store chat conversations securely.
 - **Command-Line Interface:** The project provides a command-line interface (CLI) that allows users to interact with the chat application via a text-based interface.
 - **Graphical Web Interface:** The project also includes a graphical web interface built using CherryPy, offering a user-friendly way to access and use the chat application.
